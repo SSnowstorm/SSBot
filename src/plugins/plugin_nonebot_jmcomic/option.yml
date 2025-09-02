@@ -1,0 +1,38 @@
+client:
+  cache: null
+  domain: []
+  impl: api
+  postman:
+    meta_data:
+      headers: null
+      impersonate: chrome
+      proxies: {}
+    type: curl_cffi
+  retry_times: 5
+dir_rule:
+  base_dir: D:\Project\SSbot\jmcomic_download
+  rule: Bd_Pname
+download:
+  cache: true
+  image:
+    decode: true
+    suffix: .png
+  threading:
+    image: 30
+    photo: 12
+log: true
+plugins:
+  valid: log
+  after_photo:
+      # 把章节的所有图片合并为一个pdf的插件
+      # 使用前需要安装依赖库: [pip install img2pdf]
+      - plugin: img2pdf
+        kwargs:
+          pdf_dir: D:\Project\SSbot\jmcomic_download # pdf存放文件夹
+          filename_rule: Pid # pdf命名规则，P代表photo, id代表使用photo.id也就是章节id
+  after_album:
+    - plugin: img2pdf
+      kwargs:
+        pdf_dir: D:\Project\SSbot\jmcomic_download
+        filename_rule: Aname
+version: '2.1'
