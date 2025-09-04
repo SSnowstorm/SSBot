@@ -1,7 +1,7 @@
 # plugins/jm_downloader/config.py
 from pathlib import Path
 from pydantic import Field, BaseModel
-from nonebot import get_plugin_config
+from nonebot.plugin import get_plugin_config
 from nonebot.log import logger
 
 

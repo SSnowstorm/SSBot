@@ -1,9 +1,9 @@
 # plugins/jm_downloader/__init__.py
 from nonebot import require, get_plugin_config
-from nonebot.plugin import Plugin
 from nonebot.log import logger
 
 # 导入所有需要注册的 Matcher (它们会自动被 Nonebot2 发现)
+# Nonebot 会自动扫描这些模块并注册其中的 Matcher
 from .handlers import command_jm, command_search
 
 # 导入配置模型和所有服务、构建器
@@ -13,12 +13,12 @@ from .services.jm_downloader import JmDownloaderService
 from .services.state_manager import StateManager
 from .builders.message_formatter import MessageFormatter
 
-# 初始化插件
-plugin = Plugin(name="JM Downloader Plugin")
 
+# 使用 nonebot.on_load 装饰器来注册插件加载时的回调函数
+# 这个装饰器会自动绑定到当前插件（即这个 __init__.py 所在的插件）
+# @require("nonebot_plugin_apscheduler") # 另一个常见依赖
 
-@plugin.on_load
-async def plugin_on_load():
+async def _plugin_on_load():
     """
     插件加载时执行的初始化逻辑。
     负责实例化配置、服务和构建器，并将它们注入到处理器中。

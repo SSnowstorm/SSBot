@@ -10,7 +10,7 @@ client:
     type: curl_cffi
   retry_times: 5
 dir_rule:
-  base_dir: D:\Project\SSbot\jmcomic_download
+  base_dir: src/plugins/jm_downloader/data/downloads
   rule: Bd_Pname
 download:
   cache: true
@@ -28,11 +28,11 @@ plugins:
       # 使用前需要安装依赖库: [pip install img2pdf]
       - plugin: img2pdf
         kwargs:
-          pdf_dir: D:\Project\SSbot\jmcomic_download # pdf存放文件夹
+          pdf_dir: src/plugins/jm_downloader/data/downloads # pdf存放文件夹
           filename_rule: Pid # pdf命名规则，P代表photo, id代表使用photo.id也就是章节id
   after_album:
     - plugin: img2pdf
       kwargs:
-        pdf_dir: D:\Project\SSbot\jmcomic_download
+        pdf_dir: src/plugins/jm_downloader/data/downloads
         filename_rule: Aname
 version: '2.1'
