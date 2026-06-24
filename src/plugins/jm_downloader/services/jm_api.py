@@ -39,6 +39,7 @@ class JmApi:
     def __init__(self, config: JmDownloaderConfig):
         self.config = config
         self._jm_option = self._load_jmcomic_option()
+        self._client = self._jm_option.new_jm_client()
         logger.info(f"JMCOMIC API 服务初始化完成，选项文件: {self.config.jmcomic_option_file}")
 
     def _load_jmcomic_option(self) -> jmcomic.JmOption:
@@ -47,14 +48,10 @@ class JmApi:
         """
         option_file = self.config.jmcomic_option_file
         if not option_file.exists():
-            # 如果文件不存在，尝试创建一个默认的并提示用户
-            # 在实际生产环境中，可能需要更完善的默认文件创建逻辑
             logger.warning(
                 f"JMCOMIC option file not found at {option_file}. "
-                "Attempting to create a default one. Please review and customize."
+                "Using default option. Please review and customize."
             )
-            # JmOption.default().to_file(option_file) # jmcomic 库的默认创建方法
-            # 简化处理，直接返回默认选项
             return jmcomic.JmOption.default()
 
         return jmcomic.create_option_by_file(str(option_file))
@@ -62,37 +59,16 @@ class JmApi:
     async def download_raw_comic(self, comic_id: str) -> Path:
         """
         异步下载指定ID的漫画。
-        注意：jmcomic.download_album 是同步阻塞操作，这里通过 asyncio.to_thread 转换为异步。
-        它会返回下载后的文件路径。这里假设 jmcomic 库直接生成了 PDF 文件。
+        jmcomic.download_album 是同步阻塞操作，通过 asyncio.to_thread 转换为异步。
         """
         logger.info(f"开始下载漫画 ID: {comic_id}")
         download_dir = self.config.jm_download_path
 
-        # JMCOMIC 库的 Option 对象需要设置下载目录
-        # 这里需要创建一个新的 option 实例或修改已有的，确保下载到指定目录
-        # 假设 jmcomic.create_option_by_file 内部也允许指定下载目录
-        # 或者在 _jm_option 中动态修改，这取决于 jmcomic 库的具体 API
-        # 为了演示，我们假设 jmcomic.download_album 会使用 _jm_option 里的路径，
-        # 且 _jm_option 可以在外部设置下载路径
-
-        # 实际操作中，jmcomic库的download_album方法可能需要修改option对象的download_dir属性
-        # 这里为了简化，假设_jm_option已经正确配置了下载路径
-        # 如果 jmcomic.JmOption 不支持运行时修改下载路径，可能需要每次都创建
-
-        # 为了演示，确保下载路径在option中被正确设置 (如果jmcomic支持)
         self._jm_option.download_dir = str(download_dir)
 
         try:
-            # jmcomic.download_album 可能会返回下载的路径或一个状态
-            # 这里假设它返回的是一个包含 PDF 文件的目录路径或直接的 PDF 文件路径
-            # 原始代码是拼接 {id}.pdf，所以我们也返回期望的 PDF 路径
-
-            # 由于 jmcomic 库的 download_album 是同步阻塞的，所以需要将其放入线程池
-            # jmcomic.download_album(comic_id, self._jm_option)
-            # 原始代码中生成了 {id}.pdf 和 {漫画名}.pdf，我们以 {id}.pdf 为目标
             await asyncio.to_thread(jmcomic.download_album, comic_id, self._jm_option)
 
-            # 假设下载完成后，会在 download_dir 中生成名为 "{id}.pdf" 的文件
             pdf_path = download_dir / f"{comic_id}.pdf"
             if not pdf_path.exists():
                 logger.error(f"漫画 {comic_id} 下载完成，但未找到预期的 PDF 文件：{pdf_path}")
@@ -101,7 +77,6 @@ class JmApi:
             logger.info(f"漫画 ID: {comic_id} 下载成功，文件路径: {pdf_path}")
             return pdf_path
         except jmcomic.JmcomicException as e:
-            # 捕获 jmcomic 库可能抛出的特定异常
             if "not found" in str(e).lower() or "不存在" in str(e):
                 raise JmComicNotFoundError(comic_id) from e
             elif "too many requests" in str(e).lower() or "频率过高" in str(e):
@@ -115,46 +90,25 @@ class JmApi:
     async def search_comics(self, keyword: str) -> List[Dict[str, Any]]:
         """
         异步搜索漫画。
-        注意：jmcomic 库的原始示例中没有直接的搜索API。
-        这里假设 jmcomic 提供了 `jmcomic.search_comic(keyword, option)` 类似的API。
-        如果实际没有，你需要根据 jmcomic 的文档进行调整，或者自行实现爬取搜索页面的逻辑。
+        使用 jmcomic 库的 client.search_site() 接口。
+        返回原始字典列表，每个字典包含 id, title, tags 等字段。
         """
         logger.info(f"开始搜索漫画，关键词: {keyword}")
         try:
-            # 假设 jmcomic.search_comic 是一个同步阻塞函数
-            # 它返回一个字典列表，每个字典包含漫画的原始数据
-            # 例如: [{"id": "123", "title": "xxx", ...}]
+            def _sync_search():
+                page = self._client.search_site(search_query=keyword, page=1)
+                results = []
+                for aid, title, tags in page.iter_id_title_tag():
+                    results.append({
+                        "id": str(aid),
+                        "title": title,
+                        "tags": list(tags) if tags else [],
+                        "author": None,
+                        "cover_url": None,
+                    })
+                return results[:self.config.max_search_results]
 
-            # --- START MOCK JMCOMIC SEARCH API ---
-            # 这是对 jmcomic.search_comic 的一个模拟，如果库本身没有此API，你需要自行实现
-            # 或者通过 JMCOMIC 的某种高级选项来触发搜索
-            await asyncio.sleep(1)  # 模拟网络请求延迟
-            mock_results = []
-            if "示例" in keyword:
-                mock_results = [
-                    {"id": "100001", "title": "示例漫画一", "author": "作者A", "tags": ["奇幻", "冒险"],
-                     "cover_url": "http://example.com/cover1.jpg"},
-                    {"id": "100002", "title": "示例漫画二", "author": "作者B", "tags": ["科幻", "日常"],
-                     "cover_url": "http://example.com/cover2.jpg"},
-                    {"id": "100003", "title": "示例漫画三", "author": "作者A", "tags": ["奇幻", "爱情"],
-                     "cover_url": "http://example.com/cover3.jpg"},
-                ]
-            elif "测试" in keyword:
-                mock_results = [
-                    {"id": "200001", "title": "测试作品", "author": "测试者", "tags": ["测试"],
-                     "cover_url": "http://example.com/cover_test.jpg"},
-                ]
-            else:
-                return []
-
-            # 根据配置限制返回结果数量
-            results = mock_results[:self.config.max_search_results]
-            # --- END MOCK JMCOMIC SEARCH API ---
-
-            # 真实情况下，这里应该是：
-            # raw_results = await asyncio.to_thread(jmcomic.search_comic, keyword, self._jm_option)
-            # results = raw_results[:self.config.max_search_results]
-
+            results = await asyncio.to_thread(_sync_search)
             logger.info(f"搜索关键词 '{keyword}' 找到 {len(results)} 个结果。")
             return results
         except Exception as e:
@@ -164,30 +118,30 @@ class JmApi:
     async def get_comic_details(self, comic_id: str) -> Optional[Dict[str, Any]]:
         """
         异步获取指定ID漫画的详细信息。
-        同样，假设 jmcomic 提供了 `jmcomic.get_comic_info(id, option)` 类似的API。
+        使用 jmcomic 库的 client.get_album_detail() 接口。
         """
         logger.info(f"开始获取漫画 ID: {comic_id} 的详情。")
         try:
-            # 假设 jmcomic.get_comic_info 是一个同步阻塞函数
-            # 它返回一个字典，包含漫画的详细数据
+            def _sync_get_details():
+                album = self._client.get_album_detail(comic_id)
 
-            # --- START MOCK JMCOMIC GET DETAILS API ---
-            await asyncio.sleep(0.5)  # 模拟网络请求延迟
-            if comic_id == "100001":
-                details = {"id": "100001", "title": "示例漫画一", "author": "作者A",
-                           "tags": ["奇幻", "冒险"], "cover_url": "http://example.com/cover1.jpg",
-                           "description": "这是一部关于奇幻世界冒险的漫画。", "pages": 50}
-            elif comic_id == "422866":  # 对应原始代码中的测试ID
-                details = {"id": "422866", "title": "测试漫画 (原代码ID)", "author": "测试作者",
-                           "tags": ["测试", "PDF"], "cover_url": "http://example.com/cover_test.jpg",
-                           "description": "这是用于测试的漫画，可以下载成PDF。", "pages": 20}
-            else:
-                details = None
-            # --- END MOCK JMCOMIC GET DETAILS API ---
+                author = getattr(album, 'author', None)
+                if isinstance(author, (list, tuple)):
+                    author = ", ".join(str(a) for a in author)
+                elif author is not None:
+                    author = str(author)
 
-            # 真实情况下，这里应该是：
-            # details = await asyncio.to_thread(jmcomic.get_comic_info, comic_id, self._jm_option)
+                return {
+                    "id": str(getattr(album, 'album_id', comic_id)),
+                    "title": getattr(album, 'title', '未知标题'),
+                    "author": author,
+                    "tags": list(getattr(album, 'tags', []) or []),
+                    "cover_url": None,
+                    "description": getattr(album, 'description', None) or getattr(album, 'intro', None),
+                    "pages": getattr(album, 'page_count', None),
+                }
 
+            details = await asyncio.to_thread(_sync_get_details)
             if details:
                 logger.info(f"成功获取漫画 ID: {comic_id} 的详情。")
             else:

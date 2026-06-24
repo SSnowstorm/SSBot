@@ -1,5 +1,5 @@
 # plugins/jm_downloader/builders/message_formatter.py
-from typing import List, Optional
+from typing import List
 from nonebot.adapters.onebot.v11 import Message, MessageSegment
 
 from ..models.comic_data import ComicInfo
@@ -9,16 +9,20 @@ class MessageFormatter:
     """
     负责将业务逻辑层的数据格式化为 Nonebot2 的 Message 对象。
     不包含任何业务逻辑，只关注消息的展示。
+    at_sender 由 handler 层通过 send(at_sender=True) 控制，不在 formatter 中处理。
     """
 
-    def format_downloading_message(self, comic_id: str, at_sender: bool = False) -> Message:
+    def format_searching_message(self, keyword: str) -> Message:
         """
-        生成“正在下载”的提示消息。
+        生成"正在搜索"的提示消息。
         """
-        msg = f"正在下载漫画 ID: {comic_id}，请稍候..."
-        if at_sender:
-            return MessageSegment.at(at_sender) + " " + msg
-        return Message(msg)
+        return Message(f"正在搜索 '{keyword}'，请稍候...")
+
+    def format_downloading_message(self, comic_id: str) -> Message:
+        """
+        生成"正在下载"的提示消息。
+        """
+        return Message(f"正在下载漫画 ID: {comic_id}，请稍候...")
 
     def format_download_success_message(self, comic_id: str) -> Message:
         """
@@ -37,14 +41,13 @@ class MessageFormatter:
             MessageSegment.text("为您找到以下漫画：\n")
         ]
 
-        # 限制显示数量，防止消息过长
         display_results = results[:max_display]
 
         for i, comic in enumerate(display_results):
             tags_str = f"[{', '.join(comic.tags)}]" if comic.tags else ""
             msg_parts.append(
                 MessageSegment.text(
-                    f"{i + 1}. 《{comic.title}》 - {comic.author or '未知作者'} {tags_str}\n"
+                    f"{i + 1}. 《{comic.title}》 {tags_str}\n"
                 )
             )
 
@@ -62,14 +65,11 @@ class MessageFormatter:
         """
         return Message(f"您选择了：《{comic_info.title}》(ID: {comic_info.id})，即将开始下载。")
 
-    def format_error_message(self, error_description: str, at_sender: bool = False) -> Message:
+    def format_error_message(self, error_description: str) -> Message:
         """
         生成错误提示消息。
         """
-        msg = f"操作失败，发生错误：{error_description}"
-        if at_sender:
-            return MessageSegment.at(at_sender) + " " + msg
-        return Message(msg)
+        return Message(f"操作失败，发生错误：{error_description}")
 
     def format_cancel_message(self) -> Message:
         """
@@ -82,3 +82,9 @@ class MessageFormatter:
         生成无效选择的提示消息。
         """
         return Message("输入无效，请输入有效的序号或 '取消'。")
+
+    def format_session_expired_message(self) -> Message:
+        """
+        生成会话过期的提示消息。
+        """
+        return Message("搜索会话已过期，请重新搜索。")
