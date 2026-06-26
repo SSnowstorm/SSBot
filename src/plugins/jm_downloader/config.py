@@ -4,55 +4,49 @@ from pydantic import Field, BaseModel
 from nonebot.plugin import get_plugin_config
 from nonebot.log import logger
 
+# 插件根目录：基于 __file__ 计算，与 CWD 无关
+# 无论从哪个工作目录启动 bot，路径都能正确解析到插件自身的 data 目录
+_PLUGIN_DIR = Path(__file__).parent
 
-# Nonebot2 的 PluginConfig 基础类，用于从 Nonebot 环境加载配置
+
 class PluginConfig(BaseModel):
+    """Nonebot2 的 PluginConfig 基础类，用于从 Nonebot 环境加载配置"""
     class Config:
-        extra = "ignore"  # 忽略 Nonebot 配置文件中多余的字段
+        extra = "ignore"
 
 
 class JmDownloaderConfig(PluginConfig):
     """
     JM Downloader 插件的配置模型。
-    通过 Nonebot2 的配置系统加载，支持从环境变量或 Nonebot 主配置中读取。
+    所有路径默认值基于 __file__ 计算，确保跨环境可移植性。
+    通过环境变量或 Nonebot 主配置可覆盖。
     """
-    # 漫画下载和存储的基础路径，默认为插件data目录下的downloads子目录
-    # 可通过环境变量 JM_DOWNLOAD_PATH 覆盖
+    # 漫画下载和存储的基础路径
+    # 默认: 插件目录/data/downloads
     jm_download_path: Path = Field(
-        Path("data/jm_downloader/downloads"), env="JM_DOWNLOAD_PATH"
+        _PLUGIN_DIR / "data" / "downloads", env="JM_DOWNLOAD_PATH"
     )
 
-    # jmcomic 库的选项文件路径，默认为插件data目录下的jmcomic_options.yml
-    # 可通过环境变量 JMCOMIC_OPTION_FILE 覆盖
+    # jmcomic 库的选项文件路径
+    # 默认: 插件目录/data/jmcomic_options.yml
     jmcomic_option_file: Path = Field(
-        Path("data/jm_downloader/jmcomic_options.yml"), env="JMCOMIC_OPTION_FILE"
+        _PLUGIN_DIR / "data" / "jmcomic_options.yml", env="JMCOMIC_OPTION_FILE"
     )
 
-    # 最大搜索结果数量，用于限制返回给用户的搜索结果列表长度
-    # 可通过环境变量 JM_MAX_SEARCH_RESULTS 覆盖
+    # 最大搜索结果数量
     max_search_results: int = Field(5, env="JM_MAX_SEARCH_RESULTS")
 
     # 文件上传后是否删除本地文件
-    # 可通过环境变量 JM_DELETE_AFTER_UPLOAD 覆盖
     delete_after_upload: bool = Field(True, env="JM_DELETE_AFTER_UPLOAD")
 
-    # 最大并发下载任务数，防止过多的下载任务导致资源耗尽或被 JMCOMIC 封禁
-    # 可通过环境变量 JM_MAX_CONCURRENT_DOWNLOADS 覆盖
+    # 最大并发下载任务数
     max_concurrent_downloads: int = Field(3, env="JM_MAX_CONCURRENT_DOWNLOADS")
 
-    def __post_init__(self):
-        """
-        配置加载后的初始化，确保必要的目录存在。
-        """
-        # 确保下载路径存在
+    def model_post_init(self, __context):
+        """Pydantic v2 的 post-init 钩子，确保必要目录存在"""
         self.jm_download_path.mkdir(parents=True, exist_ok=True)
-        # 如果 jmcomic option 文件不存在，可以尝试创建一个默认的
         if not self.jmcomic_option_file.exists():
             logger.warning(
                 f"JMCOMIC option file not found at {self.jmcomic_option_file}. "
-                "Please create it or configure the correct path."
+                "Using default option."
             )
-
-# 通过 Nonebot2 的 get_plugin_config 方法获取配置实例
-# 这样可以在插件的任何地方导入并使用这个唯一的配置实例
-# config = get_plugin_config(JmDownloaderConfig)

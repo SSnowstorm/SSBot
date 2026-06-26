@@ -1,3 +1,5 @@
+# jmcomic 配置文件（纯功能模板，不含路径）
+# 路径由 config.py 在加载时注入，换机器不需要修改此文件
 client:
   cache: null
   domain: []
@@ -10,29 +12,24 @@ client:
     type: curl_cffi
   retry_times: 5
 dir_rule:
-  base_dir: src/plugins/jm_downloader/data/downloads
+  # base_dir 由代码注入（config.py → jm_api._load_jmcomic_option）
   rule: Bd_Pname
 download:
   cache: true
   image:
     decode: true
-    suffix: .png
+    suffix: .png        # 下载后自动转换为 PNG，img2pdf 原生支持
   threading:
     image: 30
     photo: 12
 log: true
 plugins:
-  valid: log
-  after_photo:
-      # 把章节的所有图片合并为一个pdf的插件
-      # 使用前需要安装依赖库: [pip install img2pdf]
-      - plugin: img2pdf
-        kwargs:
-          pdf_dir: src/plugins/jm_downloader/data/downloads # pdf存放文件夹
-          filename_rule: Pid # pdf命名规则，P代表photo, id代表使用photo.id也就是章节id
+  valid: [log, img2pdf]   # 启用 img2pdf 插件
+  after_photo: []           # 不需要按章节生成 PDF
   after_album:
     - plugin: img2pdf
       kwargs:
-        pdf_dir: src/plugins/jm_downloader/data/downloads
-        filename_rule: Aname
+        # pdf_dir 由代码注入
+        filename_rule: Aid          # A=album, id=用漫画ID命名 → {id}.pdf
+        delete_original_file: true  # 生成 PDF 后删除原始图片
 version: '2.1'
