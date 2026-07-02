@@ -1,0 +1,52 @@
+menu:
+  title: "SSBot 帮助菜单"
+  subtitle: "点击下方分类查看功能"
+
+  categories:
+    - id: comic
+      label: "漫画工具"
+      style: primary
+      permission: user
+      items:
+        - id: jm_download
+          label: "/jm 下载漫画"
+          type: command
+          action: "jm"
+          permission: user
+        - id: jm_search
+          label: "/jm搜索 搜索漫画"
+          type: command
+          action: "jm搜索"
+          permission: user
+
+    - id: games
+      label: "娱乐游戏"
+      style: success
+      permission: user
+      items:
+        - id: tic_tac_toe
+          label: "井字棋"
+          type: command
+          action: "井字棋"
+          permission: user
+
+    - id: system
+      label: "系统管理"
+      style: warning
+      permission: admin
+      items:
+        - id: status
+          label: "查看状态"
+          type: command
+          action: "status"
+          permission: admin
+        - id: restart
+          label: "重启 Bot"
+          type: command
+          action: "restart"
+          permission: super_admin
+
+permissions:
+  admins: []
+  vip_users: []
+  banned_users: []

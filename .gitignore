@@ -16,6 +16,10 @@ build/
 # 下载文件（运行时生成）
 src/plugins/jm_downloader/data/downloads/
 
+# 爬虫临时缓存（断点续传用，跑完可删）
+data/*.partial.json
+data/*.tmp
+
 # IDE
 .idea/
 .vscode/
