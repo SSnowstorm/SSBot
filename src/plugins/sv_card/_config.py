@@ -17,8 +17,8 @@ class SVCardConfig(BaseModel):
     # 英文数据源URL
     en_cards_url: str = "https://raw.githubusercontent.com/ParticleG/shadowverse-wb-db/main/cards.json"
 
-    # 中文数据源URL（预留）
-    chs_cards_url: Optional[str] = None
+    # 中文数据源路径（本地 JSON）
+    chs_cards_path: str = "src/plugins/sv_card/data/cards_cn_translated.json"
 
     # 缓存过期时间（小时）
     cache_expire_hours: int = 24
@@ -42,14 +42,17 @@ class SVCardConfig(BaseModel):
     auto_load_on_startup: bool = True
 
     # 职业名称映射（中文到代码）
+    # card_id[3] → 职业代码（0=中立/1=精灵/2=皇家/3=法师/4=龙族/5=梦魇/6=主教/7=超越者）
+    # 注意：SV2 将原版死灵+吸血鬼合并为深渊（中文"梦魇"）
     class_name_map: dict[str, str] = {
         "中立": "0",
-        "森林": "1",
-        "剑": "2",
-        "龙": "3",
-        "死": "5",
+        "精灵": "1",
+        "皇家": "2",
+        "法师": "3",
+        "龙族": "4",
+        "梦魇": "5",
         "主教": "6",
-        "魂": "7",
+        "超越者": "7",
     }
 
 

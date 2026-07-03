@@ -4,73 +4,143 @@
 功能：
     - 格式化单卡详情为文本消息
     - 格式化搜索结果列表
-    - 清理技能描述中的HTML标签
+    - 处理 skill_text 中的格式标签（<color> <ev> <sev> <hr> <ridx>）
+    - 翻译质量提示：skill_text 残留假名时附日文原文对照
+
+注意：
+    - 不显示 flavour_text（用户决定：风味文本翻译质量差，不展示）
+    - type/rarity 已从 int 转换为中文名
+    - class 从 card_id[3] 推断，已转 class_code + class_name
 """
 
 import re
 from typing import Optional
 
-from ._cache import CLASS_CODE_TO_NAME, RARITY_CODE_TO_NAME
 
+# ============== 格式标签处理 ==============
+
+# skill_text 中的标签语义对照（用于简化显示）
+# 注意：原始数据里 <color=Keyword> 是大写 K，但部分可能是 <color=keyword>
+# 为安全起见使用正则处理
+_IMPORT_RE = re.compile(r'<color=([^>]+)>', re.IGNORECASE)
+_CLOSE_RE = re.compile(r'</color>', re.IGNORECASE)
+
+
+def _render_skill_text(text: str) -> str:
+    """把 skill_text 中的格式标签转换为更适合纯文本显示的形式。
+
+    原始数据的特点（用户翻译时加的）：
+        - 已经用中文方括号【...】标记每个效果段
+        - 用 <color=Keyword>...</color> 高亮关键词
+        - 用 <ev>...</ev> 标记进化效果
+        - 用 <sev>...</sev> 标记超进化效果
+        - 用 <hr> 标记基础/进化分隔
+        - 用 <ridx=N>...</ridx> 标记选项块
+
+    渲染策略：去掉 HTML 风格的 <...> 标签，保留中文方括号，仅对特殊标签加修饰：
+        <color=...>...</color>  → 直接去掉（保留内部文字，外层【】已存在）
+        <ev>...</ev>           → 前面加 ↳ 进化时：
+        <sev>...</sev>         → 前面加 ↳ 超进化时：
+        <hr>                   → 单独一行 ────
+        <ridx=N>...</ridx>     → （N+1）...
+    """
+    if not text:
+        return ""
+
+    out = text
+
+    # 1) 超进化 / 进化（不区分大小写）
+    out = re.sub(r'<sev>', '\n↳ 超进化时：', out, flags=re.IGNORECASE)
+    out = re.sub(r'</sev>', '', out, flags=re.IGNORECASE)
+    out = re.sub(r'<ev>', '\n↳ 进化时：', out, flags=re.IGNORECASE)
+    out = re.sub(r'</ev>', '', out, flags=re.IGNORECASE)
+
+    # 2) 分隔线
+    out = re.sub(r'<hr>', '\n────────\n', out, flags=re.IGNORECASE)
+
+    # 3) 选项块：保留标签内的（1）（2）原文，只去掉 <ridx=N> </ridx> 标签
+    out = re.sub(r'<ridx=\d+>', '', out, flags=re.IGNORECASE)
+    out = re.sub(r'</ridx>', '', out, flags=re.IGNORECASE)
+
+    # 4) 颜色标签：去掉 <color=...> 和 </color>，只留下内部文字
+    out = re.sub(r'<color=[^>]+>', '', out, flags=re.IGNORECASE)
+    out = re.sub(r'</color>', '', out, flags=re.IGNORECASE)
+
+    # 5) 任何残留的 <...> 标签全部移除
+    out = re.sub(r'<[^>]+>', '', out)
+
+    # 6) 多余空白清理
+    out = re.sub(r'\n{3,}', '\n\n', out)
+    out = re.sub(r' {2,}', ' ', out)
+    return out.strip()
+
+
+# ============== 单卡详情 ==============
 
 def format_single_card(card: dict) -> str:
-    """格式化单张卡牌为文本消息。
-
-    Args:
-        card: 卡牌数据
-
-    Returns:
-        格式化的文本消息
-    """
+    """格式化单张卡牌为文本消息。"""
     # 基础信息
     card_id = card.get("id", "")
-    name = card.get("name", "未知")
-    card_type = _translate_type(card.get("type", ""))
-    cost = card.get("cost", "-")
-    atk = card.get("atk", "-")
-    life = card.get("life", "-")
+    name = card.get("name") or "未知"
+    name_ja = card.get("name_ja", "")
 
-    # 职业与稀有度
-    class_code = str(card.get("class", "0"))
-    class_name = _translate_class(card.get("color", ""), class_code)
-    rarity_code = str(card.get("rarity", "1"))
-    rarity_name = RARITY_CODE_TO_NAME.get(rarity_code, "铜")
+    class_name = card.get("class_name", "中立")
+    type_name = card.get("type_name", "未知")
+    rarity_name = card.get("rarity_name", "铜")
+    cost = card.get("cost", 0)
+    atk = card.get("atk", 0)
+    life = card.get("life", 0)
 
-    # 技能描述
-    skill_text = _clean_html(card.get("skill_text", ""))
-    evo_skill_text = _clean_html(card.get("evo_skill_text", ""))
+    # 技能描述（含翻译质量提示）
+    skill_text = _render_skill_text(card.get("skill_text", ""))
+    skill_text_ja = _render_skill_text(card.get("skill_text_ja", ""))
+    skill_has_kana = card.get("skill_has_kana", False)
 
-    # 风味文本
-    flavour_text = _clean_html(card.get("flavour_text", ""))
+    # 进化技能（API 恒空，进化效果已在 skill_text 的 <ev> 中处理）
+    evo_skill_text = _render_skill_text(card.get("evo_skill_text", ""))
 
-    # 插画师与CV
+    # 插画师 & CV
     illustrator = card.get("illustrator", "")
     cv = card.get("cv", "")
 
-    # 构建消息
+    # 种族
+    tribes = card.get("tribes", []) or []
+
     lines = []
 
-    # 标题行
-    lines.append(f"━━━━ {name} ━━━━")
-    lines.append(f"【{rarity_name}】【{class_name}】【{card_type}】")
+    # 标题（中日文对照）
+    if name_ja and name_ja != name:
+        lines.append(f"━━━━ {name} ━━━━")
+        lines.append(f"  日文: {name_ja}")
+    else:
+        lines.append(f"━━━━ {name} ━━━━")
+
+    # 属性行
+    lines.append(f"【{rarity_name}】【{class_name}】【{type_name}】")
     lines.append(f"费用: {cost}  攻击: {atk}  生命: {life}")
 
-    # 分隔线
+    # 种族
+    if tribes:
+        tribe_names = [_tribe_to_name(t) for t in tribes if t]
+        if tribe_names:
+            lines.append(f"种族: {' / '.join(tribe_names)}")
+
     lines.append("─" * 20)
 
     # 技能描述
     if skill_text:
         lines.append(f"【技能】{skill_text}")
 
-    # 进化技能
+    # 进化技能（备用，正常情况已通过 <ev> 显示）
     if evo_skill_text:
         lines.append(f"【进化】{evo_skill_text}")
 
-    # 风味文本
-    if flavour_text:
-        lines.append(f"「{flavour_text}」")
+    # 翻译质量提示
+    if skill_has_kana and skill_text_ja and skill_text_ja != skill_text:
+        lines.append("")
+        lines.append(f"【日文】{skill_text_ja}")
 
-    # 分隔线
+    # 分隔
     lines.append("─" * 20)
 
     # 附加信息
@@ -79,26 +149,19 @@ def format_single_card(card: dict) -> str:
         info_parts.append(f"画师: {illustrator}")
     if cv:
         info_parts.append(f"CV: {cv}")
-
     if info_parts:
         lines.append(" | ".join(info_parts))
 
-    # 卡片ID
+    # 卡片 ID
     lines.append(f"[ID: {card_id}]")
 
     return "\n".join(lines)
 
 
+# ============== 搜索结果列表 ==============
+
 def format_search_results(cards: list[dict], keyword: str) -> str:
-    """格式化搜索结果列表。
-
-    Args:
-        cards: 卡牌列表
-        keyword: 搜索关键词
-
-    Returns:
-        格式化的文本消息
-    """
+    """格式化搜索结果列表。"""
     if not cards:
         return f"未找到包含「{keyword}」的卡牌。"
 
@@ -107,56 +170,53 @@ def format_search_results(cards: list[dict], keyword: str) -> str:
     lines.append("")
 
     for i, card in enumerate(cards, 1):
-        # 基础信息
-        name = card.get("name", "未知")
-        card_type = _translate_type(card.get("type", ""))
-        cost = card.get("cost", "-")
-        atk = card.get("atk", "-")
-        life = card.get("life", "-")
-
-        # 职业与稀有度
-        class_code = str(card.get("class", "0"))
-        class_name = _translate_class(card.get("color", ""), class_code)
-        rarity_code = str(card.get("rarity", "1"))
-        rarity_name = RARITY_CODE_TO_NAME.get(rarity_code, "铜")
+        name = card.get("name") or "未知"
+        class_name = card.get("class_name", "中立")
+        type_name = card.get("type_name", "未知")
+        rarity_name = card.get("rarity_name", "铜")
+        cost = card.get("cost", 0)
+        atk = card.get("atk", 0)
+        life = card.get("life", 0)
 
         # 简化的技能描述（只取第一行）
-        skill_text = _clean_html(card.get("skill_text", ""))
-        if len(skill_text) > 30:
-            skill_text = skill_text[:27] + "..."
+        skill_text = _render_skill_text(card.get("skill_text", ""))
+        first_line = skill_text.split("\n", 1)[0] if skill_text else ""
+        if len(first_line) > 30:
+            first_line = first_line[:27] + "..."
 
-        # 格式化行
-        status = f"{cost}费" if cost != "-" else ""
-        status += f"/{atk}攻" if atk != "-" else ""
-        status += f"/{life}血" if life != "-" else ""
+        # 状态行
+        status_parts = []
+        if cost:
+            status_parts.append(f"{cost}费")
+        if atk:
+            status_parts.append(f"{atk}攻")
+        if life:
+            status_parts.append(f"{life}血")
+        status = "/".join(status_parts)
 
         line = f"{i}. {name}"
-        line += f" [{rarity_name}][{class_name}][{card_type}]"
+        line += f" [{rarity_name}][{class_name}][{type_name}]"
         if status:
             line += f" {status}"
 
-        if skill_text:
-            line += f"\n   {skill_text}"
+        if first_line:
+            line += f"\n   {first_line}"
+
+        # 翻译质量提示（仅在严重残留时提示）
+        if card.get("skill_has_kana"):
+            line += "  ※含日文残留"
 
         lines.append(line)
 
-    if len(cards) == 10:
+    if len(cards) >= 10:
         lines.append("")
-        lines.append(f"（仅显示前10条结果，请使用更精确的关键词）")
+        lines.append("（仅显示前10条结果，请使用更精确的关键词）")
 
     return "\n".join(lines)
 
 
 def format_card_list(cards: list[dict], title: str = "") -> str:
-    """格式化卡牌列表（简洁模式）。
-
-    Args:
-        cards: 卡牌列表
-        title: 列表标题
-
-    Returns:
-        格式化的文本消息
-    """
+    """格式化卡牌列表（简洁模式）。"""
     if not cards:
         return "卡牌列表为空。"
 
@@ -166,120 +226,52 @@ def format_card_list(cards: list[dict], title: str = "") -> str:
         lines.append("")
 
     for i, card in enumerate(cards, 1):
-        name = card.get("name", "未知")
+        name = card.get("name") or "未知"
         card_id = card.get("id", "")
-        lines.append(f"{i}. {name} [{card_id}]")
+        class_name = card.get("class_name", "")
+        lines.append(f"{i}. {name} [{class_name}] [{card_id}]")
 
     return "\n".join(lines)
 
 
-def _translate_type(card_type: str) -> str:
-    """翻译卡牌类型为中文。"""
-    type_map = {
-        "follower": "随从",
-        "spell": "法术",
-        "amulet": "护符",
-        "token": "衍生物",
-        "token follower": "衍生物",
-        "enhance": "强化",
-    }
-    return type_map.get(card_type.lower(), card_type)
+# ============== 辅助函数 ==============
+
+# 种族代码 → 中文名（与 tribes 字段对应）
+_TRIBE_CODE_TO_NAME = {
+    0: "",
+    1: "人类",
+    2: "精灵",
+    3: "野兽",
+    4: "魔法师",
+    5: "龙",
+    6: "恶魔",
+    7: "不死",
+    8: "神",
+    9: "武人",
+    10: "机械",
+    11: "造物",
+}
 
 
-def _translate_class(color: str, class_code: str) -> str:
-    """翻译职业为中文。"""
-    # 优先使用职业代码
-    chinese_name = CLASS_CODE_TO_NAME.get(class_code)
-    if chinese_name:
-        return chinese_name
-
-    # 使用英文颜色名称
-    color_lower = color.lower()
-    if "forest" in color_lower:
-        return "森林"
-    elif "sword" in color_lower:
-        return "剑"
-    elif "rune" in color_lower:
-        return "龙"
-    elif "dragon" in color_lower:
-        return "龙"
-    elif "abyss" in color_lower:
-        return "死"
-    elif "haven" in color_lower:
-        return "主教"
-    elif "portal" in color_lower:
-        return "魂"
-    elif "neutral" in color_lower:
-        return "中立"
-
-    return color or "中立"
+def _tribe_to_name(tribe_code: int) -> str:
+    """种族代码 → 中文名。"""
+    return _TRIBE_CODE_TO_NAME.get(tribe_code, "")
 
 
-def _clean_html(text: str) -> str:
-    """清理HTML标签，保留文本内容。
+# ============== 图片 URL ==============
 
-    Args:
-        text: 包含HTML的原始文本
-
-    Returns:
-        清理后的纯文本
-    """
-    if not text:
-        return ""
-
-    # 替换换行标签
-    text = text.replace("<br>", "\n")
-    text = text.replace("<br/>", "\n")
-    text = text.replace("<br />", "\n")
-    text = text.replace("\\n", "\n")
-
-    # 移除所有HTML标签
-    text = re.sub(r"<[^>]+>", "", text)
-
-    # 清理多余的空白
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    text = text.strip()
-
-    return text
-
-
-def _format_skill_text(skill_text: str, max_length: int = 100) -> str:
-    """格式化技能描述，限制长度。
-
-    Args:
-        skill_text: 原始技能描述
-        max_length: 最大长度
-
-    Returns:
-        格式化后的技能描述
-    """
-    text = _clean_html(skill_text)
-
-    if len(text) <= max_length:
-        return text
-
-    return text[: max_length - 3] + "..."
-
-
-def get_card_image_url(card: dict, lang: str = "en") -> Optional[str]:
-    """获取卡牌图片URL。
+def get_card_image_url(card: dict, lang: str = "cht") -> Optional[str]:
+    """获取卡牌图片 URL。
 
     Args:
         card: 卡牌数据
-        lang: 语言代码（en, chs, cht, ja, ko）
+        lang: 语言代码（en/chs/cht/ja/ko），默认 cht（繁体，bot 图片可显示）
 
     Returns:
-        卡牌图片URL
+        卡牌图片 URL
     """
-    # 优先使用卡片自带的图片URL
-    image_url = card.get("image")
-    if image_url:
-        return image_url
-
-    # 尝试从ID构造图片URL
+    # 用户数据里 base_card_image_id 恒空，直接用 card_id 拼
     card_id = card.get("id")
     if card_id:
-        # shadowverse-portal的图片URL格式
         return f"https://shadowverse-portal.com/image/card/{lang}/C_{card_id}.png"
-
     return None

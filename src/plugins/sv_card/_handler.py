@@ -40,8 +40,9 @@ sv_reload = on_command(
 # ============== 参数提取 ==============
 
 # 匹配命令前缀：/sv  或  sv （后接可选空白 + 参数）
+# 严格匹配：必须是 "命令名 + 空白 + 参数"，避免 "sv_reload" 之类被误判
 _CMD_PREFIX_RE = re.compile(
-    r"^\s*(?:[/／\\]?(?:sv|SV|影之诗|查卡))\s*(.*)$",
+    r"^\s*(?:[/／\\]?(?:sv|SV|影之诗|查卡))\s+(.*)$",
     flags=re.IGNORECASE,
 )
 
@@ -73,11 +74,16 @@ async def handle_sv_command(bot: Bot, event: MessageEvent):
         await _send_help(bot, event)
         return
 
-    # 检查是否为ID精确查询 (!ID)
+    # 检查是否为ID精确查询 (!ID 或纯7-8位数字)
     id_match = re.match(r'^!(\d+)$', arg_text)
     if id_match:
         card_id = id_match.group(1)
         await _handle_id_query(bot, event, card_id)
+        return
+
+    # 纯数字（7-8位）也自动视为 ID 查询（用户可能不加 ! 前缀）
+    if re.match(r'^\d{7,8}$', arg_text):
+        await _handle_id_query(bot, event, arg_text)
         return
 
     # 检查是否为职业过滤 (#职业)
@@ -115,19 +121,25 @@ async def _send_help(bot: Bot, event: MessageEvent):
     help_text = """📖 影之诗：超凡世界 查卡器
 
 【命令格式】
-/sv <关键词>       模糊搜索卡片
-/sv #<职业>        按职业过滤
-/sv !<ID>          按卡牌ID精确查询
-/sv_reload         重新加载数据
+    /sv <关键词>       模糊搜索卡片
+    /sv #<职业>        按职业过滤
+    /sv !<ID>          按卡牌ID精确查询
+    /sv <ID>           直接输入7-8位ID也可查询（不加!也行）
+    /sv_reload         重新加载数据
 
 【职业代码】
-#剑  #森林  #龙  #死  #主教  #魂
+#精灵  #皇家  #法师  #龙族  #梦魇  #主教  #超越者
 #中立
 
 【示例】
-/sv Albert
-/sv #剑
-/sv !10124110
+/sv 不屈的战士
+/sv #精灵
+/sv !10001110
+
+【说明】
+- 卡牌数据：简体中文翻译版（735 张，来源：自制翻译引擎）
+- 技能文本若含日文残留会自动附原文对照
+- 风味文本暂不展示（翻译质量待优化）
 """
     await bot.send(event=event, message=help_text)
 
