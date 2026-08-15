@@ -385,9 +385,10 @@ async def init_cache():
 def _try_register_scheduler():
     """尝试注册定时任务（scheduler 插件可选）。"""
     try:
-        import nonebot
-        plugin_list = nonebot.get_plugin_list()
-        if "nonebot-plugin-scheduler" not in plugin_list:
+        from nonebot import get_loaded_plugins
+        # nonebot 2.5 已移除 get_plugin_list()，改用 get_loaded_plugins()（返回 Plugin 对象）
+        plugin_names = {p.name.replace("-", "_") for p in get_loaded_plugins()}
+        if "nonebot_plugin_scheduler" not in plugin_names:
             _get_logger().debug("nonebot-plugin-scheduler 未安装，跳过定时任务")
             return
 

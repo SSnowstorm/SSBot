@@ -29,3 +29,6 @@ data/*.tmp
 # OS
 .DS_Store
 Thumbs.db
+
+# SuggarChat ORM 数据库（运行时生成，含对话记忆）
+data/nonebot_plugin_orm/
