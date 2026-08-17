@@ -1,7 +1,7 @@
 [project]
 name = "SSbot"
 version = "0.1.0"
-description = "SSbot - 基于 NoneBot2 的 QQ 群聊机器人，支持 JM 漫画搜索下载"
+description = "SSbot - 基于 NoneBot2 的 QQ 群聊机器人，支持 JM 漫画搜索下载、影之诗查卡、AI 群聊"
 readme = "README.md"
 requires-python = ">=3.9, <4.0"
 dependencies = [
@@ -11,6 +11,9 @@ dependencies = [
     "img2pdf>=0.5.0",
     "pyyaml>=6.0",
     "zhconv>=1.4.3",
+    "requests>=2.28",
+    "python-dotenv>=1.0",
+    "nonebot-plugin-suggarchat>=3.7.0",
 ]
 
 [tool.nonebot]
