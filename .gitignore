@@ -32,3 +32,6 @@ Thumbs.db
 
 # SuggarChat ORM 数据库（运行时生成，含对话记忆）
 data/nonebot_plugin_orm/
+
+# AI 配置台备份（运行时生成，勿入库）
+data/ai_config_console/

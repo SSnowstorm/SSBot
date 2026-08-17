@@ -31,6 +31,7 @@ nonebot.load_plugins("src/plugins/get_group_info")
 nonebot.load_plugin("src.plugins.interactive_help")
 nonebot.load_plugin("src.plugins.sv_card")
 nonebot.load_plugin("nonebot_plugin_suggarchat")  # AI 聊天（SuggarChat）
+nonebot.load_plugin("src.plugins.ai_config_console")  # SuggarChat 管理系统（AI 配置台）
 # nonebot.load_plugins("src/plugins/plugin_nonebot_jmcomic")  # 配置路径未指定，暂不加载
 
 
