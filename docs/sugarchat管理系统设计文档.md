@@ -1,6 +1,6 @@
 # SuggarChat 管理系统设计文档
 
-> 版本：v1.2（2026-08-17）
+> 版本：v1.3（2026-08-17）
 > 适用范围：SSBot 项目内 nonebot-plugin-suggarchat 3.7.0
 > 定位：管理系统（后端 API）先行开发，Web 网页作为派生视图后续开发
 > 前置文档：[sugarchat管理与省token设计案.md](./sugarchat管理与省token设计案.md)（治理层设计）
@@ -219,28 +219,30 @@ def require_token(x_ai_config_token: str = Header(default="")) -> None:
 
 ---
 
-## 6. 网页派生方案（P3，后续阶段）
+## 6. 网页派生方案（P3，已完成 2026-08-17）
 
-- 静态页放 `static/`，FastAPI 挂载：`app.mount("/ai-config", StaticFiles(directory=static, html=True))`
-- 页面结构（单页应用，原生 JS，无构建）：
-  - 登录页：Token 输入 → localStorage
-  - 配置页：9 组配置表单（分组折叠）
-  - 人格页：group/private 双 Tab，列表 + 编辑器
-  - 用量页：近 7 天 Token/次数图表
+- 静态页放 `static/`，FastAPI 挂载：`app.mount("/ai-config", StaticFiles(directory=static, html=True))`；static 目录存在才挂载（不存在仅警告不报错）
+- 页面结构（单页应用，原生 JS，无构建，零依赖）：
+  - **登录页**：Token 输入 → localStorage，401 自动登出
+  - **配置页**：9 组配置表单（分组折叠），字段级元数据（label/说明/示例），布尔→开关、数组→逗号分隔、长文本→textarea；只读字段禁用 + api_key 打码；可写/只读徽标
+  - **人格页**：group/private 双 Tab，列表 + 编辑器 + 新建/删除
+  - **用量页**：SVG 柱状图（原生绘制），近 7/14/30 天切换，次数 + Token 双图
+  - **备份页**：手动备份 config.toml，展示备份文件名
 - **API 契约即前后端接口**：网页只调 4.1~4.3 的 API，不接触文件系统
+- **实现文件**：`src/plugins/ai_config_console/static/index.html`；测试 `scripts/test_ai_config_web.py`（17/17 通过）
 
 ---
 
 ## 7. 开发里程碑
 
-| 阶段 | 内容 | 验收 |
+| 阶段 | 内容 | 状态 |
 |---|---|---|
-| P1 只读 API（0.5天） | 插件骨架、_auth、_api GET 路由、_usage、_models | curl 验证：GET /config 打码、GET /usage 有数据 |
-| P2 写操作 API（0.5天） | _config_store 原子写+备份、_prompt_store CRUD | curl 改配置 → 热重载生效；改人格 → /choose_prompt 可见 |
-| P3 网页（后续阶段，P1/P2 验收后再排期） | static/ 单页：登录/配置/人格/用量 | 浏览器全流程操作，与 P1/P2 API 对接 |
-| P4 收尾 | README 补充、变更记录、备份清理策略 | 文档齐全 |
+| P1 只读 API | 插件骨架、_auth、_api GET 路由、_usage、_models | ✅ 已完成（curl 验证通过） |
+| P2 写操作 API | _config_store 原子写+备份、_prompt_store CRUD | ✅ 已完成（30/30 测试通过） |
+| P3 网页 | static/ 单页：登录/配置/人格/用量/备份 | ✅ 已完成（17/17 测试通过） |
+| P4 收尾 | README 补充、变更记录、备份清理策略 | ✅ 已完成（README 含配置台章节） |
 
-> 交付节奏决策（决策 1）：P1/P2 合并为一个交付单元（后端 API，curl 可验），验收通过后再排期 P3 网页。
+> 交付节奏决策（决策 1）：P1/P2 先交付（curl 可验），P3 网页随后开发，现已全部完成。
 
 ---
 
@@ -266,3 +268,4 @@ def require_token(x_ai_config_token: str = Header(default="")) -> None:
 | 2026-08-17 | 初版设计文档（v1.0） | 王遵诗 / WorkBuddy |
 | 2026-08-17 | v1.1：4 项决策定稿（P1/P2 单独交付、Token 自动生成、备份保留 10 份、用量仅统计次数），第 8 章改为决策记录，同步更新 1.3/4.3/5.2/5.3/7 章 | 王遵诗 / WorkBuddy |
 | 2026-08-17 | v1.2：新增决策 5——admin 组纳入网页可编辑（admins/admin_group/allow_send_to_admin），SUPERUSERS 维持 .env 单一来源 | 王遵诗 / WorkBuddy |
+| 2026-08-17 | v1.3：P3 网页完成——第 6 章改为实现说明（5 视图 + 字段元数据 + 测试 17/17），第 7 章里程碑全部 ✅ | 王遵诗 / WorkBuddy |
