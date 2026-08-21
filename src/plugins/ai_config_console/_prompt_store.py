@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ._config_store import CONFIG_DIR, BACKUP_ROOT
-from ._models import NAME_PATTERN, CONTENT_MAX, SCENES
+from ._models import NAME_PATTERN, PROMPT_MAX_LENGTH, SCENES
 
 PROMPT_DIRS = {
     "group": CONFIG_DIR / "group_prompts",
@@ -38,8 +38,8 @@ def _validate_content(content: str) -> str:
     content = content.strip()
     if not content:
         raise ValueError("人格内容不能为空")
-    if len(content) > CONTENT_MAX:
-        raise ValueError(f"人格内容超过 {CONTENT_MAX} 字上限")
+    if len(content) > PROMPT_MAX_LENGTH:
+        raise ValueError(f"人格内容超过 {PROMPT_MAX_LENGTH} 字上限")
     return content
 
 

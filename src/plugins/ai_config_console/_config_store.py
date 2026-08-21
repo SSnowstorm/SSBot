@@ -27,7 +27,8 @@ BACKUP_KEEP = 10
 # 可编辑分组 → config.toml 中的 TOML 段映射
 # key: API 分组名, value: (TOML 段, 可编辑字段白名单, None=整段可编辑)
 EDITABLE_MAP = {
-    "basic": (None, {"enable", "parse_segments"}),
+    "basic": (None, {"enable", "parse_segments", "group_prompt_character",
+                     "private_prompt_character"}),
     "model": ("default_preset", {"model", "base_url"}),
     "admin": ("admin", {"admins", "admin_group", "allow_send_to_admin"}),
     "session": ("session", None),
@@ -89,8 +90,7 @@ def get_config() -> dict:
 
     # 只读字段（返回但标注 editable: false）
     read_only = {
-        "basic": {"matcher_function", "preset", "group_prompt_character",
-                  "private_prompt_character"},
+        "basic": {"matcher_function", "preset"},
         "model": {"api_key", "protocol", "thought_chain_model", "multimodal"},
     }
 
@@ -124,6 +124,22 @@ def backup_config() -> Path:
     for old in backups[:-BACKUP_KEEP]:
         old.unlink(missing_ok=True)
     return dest
+
+
+def list_backups() -> list[dict]:
+    """列出 config.toml 备份文件（最近 BACKUP_KEEP 份，按时间倒序）。"""
+    if not BACKUP_ROOT.is_dir():
+        return []
+    items = []
+    for f in BACKUP_ROOT.glob("config_*.toml"):
+        stat = f.stat()
+        items.append({
+            "name": f.name,
+            "size": stat.st_size,
+            "updated": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+        })
+    items.sort(key=lambda x: x["updated"], reverse=True)
+    return items[:BACKUP_KEEP]
 
 
 def update_config(req_groups: dict) -> Path:

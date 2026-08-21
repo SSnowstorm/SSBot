@@ -14,7 +14,7 @@
 
 ## 0. 结论先行
 
-- 共 **9 组 / 60+ 字段**，网页暴露 **核心可写 24 项**，**只读 5 项**（api_key 打码、matcher_function、preset 等），**不暴露 ~15 项**（低频/危险/内部项）
+- 共 **9 组 / 60+ 字段**，网页暴露 **核心可写 26 项**，**只读 3 项**（api_key 打码、matcher_function、preset），**不暴露 ~15 项**（低频/危险/内部项）
 - 控件映射：布尔 → 开关，整数 → 数字输入，短文本 → 输入框，长文本/数组 → 文本域，枚举 → 下拉
 - 设计案重点项（A1~A7）全部落入"核心可写"，网页默认折叠展开
 - 人格文件不在此清单（走 `/prompts/{scene}` 独立 API，见管理系统设计文档 4.2）
@@ -41,8 +41,8 @@
 | parse_segments           | bool | true      | 保持    | 🔵   | 开关 | 解析消息段                        |
 | matcher_function         | bool | true      | 保持    | ⚪ 只读 | -  | 钩子功能开关，改动影响自定义钩子             |
 | preset                   | str  | "default" | 保持    | ⚪ 只读 | -  | 预设名，切换走 `/choose_prompt` 更安全 |
-| group_prompt_character   | str  | "default" | 见人格管理 | ⚪ 只读 | -  | 群人格指向，由 /prompts API 管理      |
-| private_prompt_character | str  | "default" | 见人格管理 | ⚪ 只读 | -  | 私聊人格指向，同上                    |
+| group_prompt_character   | str  | "Yuki" | 按需   | 🔵   | 下拉 | 群人格指向，选项来自 /prompts/group 已有人格，保存即热切换 |
+| private_prompt_character | str  | "Yuki" | 按需   | 🔵   | 下拉 | 私聊人格指向，选项来自 /prompts/private 已有人格，保存即热切换 |
 
 ### 2.2 模型（model，对应 default_preset）
 
@@ -160,8 +160,8 @@
 
 | 分层      | 数量    | 分布                                                            |
 | ------- | ----- | ------------------------------------------------------------- |
-| 🔵 核心可写 | 27 项  | 模型 2、admin 3、会话 4、自动回复 5、功能 7、llm 8（含 A4/A5/A6）、tools 6（含 A1/A2）、限额 7 |
-| ⚪ 只读    | 5 项   | enable 系、preset、人格指向、api_key（打码）                              |
+| 🔵 核心可写 | 29 项  | 模型 2、admin 3、会话 4、自动回复 5、功能 7、llm 8（含 A4/A5/A6）、tools 6（含 A1/A2）、限额 7、人格指向 2 |
+| ⚪ 只读    | 3 项   | matcher_function、preset、api_key（打码）                                |
 | ⚫ 不暴露   | ~12 项 | cookies/extended/extra/preset_extension/内部项                  |
 
 **设计案重点项覆盖**：A1 enable_report ✅、A2 report_exclude\_* ✅、A3 memory_lenth_limit ✅、A4 poke_reply ✅、A5 synthesize_forward_message ✅、A6 max_tokens ✅、A7 人格文件（走 /prompts API）✅
@@ -184,3 +184,4 @@
 | 2026-08-17 | 初版配置项清单（v1.0） | 王遵诗 / WorkBuddy |
 | 2026-08-17 | v1.1：[admin] 组纳入网页可编辑（admins/admin_group/allow_send_to_admin），核心可写 24→27 项；SUPERUSERS 维持 .env 单一来源 | 王遵诗 / WorkBuddy |
 | 2026-08-17 | v1.2：enable_tools 当前值更新为 false（F1 关闭，防工具复读） | 王遵诗 / WorkBuddy |
+| 2026-08-18 | v1.3：配合网页样式重构——人格字数上限改为环境变量 AI_PROMPT_MAX_LENGTH 可配置（默认 2000，安全兜底 10000）；网页新增省 Token 徽标（A1~A7 项标记「推荐关闭/推荐开启/已优化」）、今日汇总卡、三区折叠、字数统计软提示 | 王遵诗 / WorkBuddy |

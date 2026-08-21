@@ -10,6 +10,8 @@ from . import _config_store, _prompt_store, _usage
 from ._auth import require_token
 from ._models import (
     SCENES,
+    BackupItem,
+    BackupListResp,
     BackupResp,
     ConfigUpdateReq,
     ConfigUpdateResp,
@@ -20,6 +22,7 @@ from ._models import (
     PromptPutReq,
     StatusResp,
     UsageResp,
+    get_prompt_max,
 )
 
 # 无前缀路由，挂载时统一加 /ai-config/api
@@ -39,7 +42,7 @@ async def status() -> StatusResp:
                 break
     except Exception:
         pass
-    return StatusResp(suggarchat_loaded=suggarchat_loaded)
+    return StatusResp(suggarchat_loaded=suggarchat_loaded, prompt_max_length=get_prompt_max())
 
 
 @router.get("/config", response_model=dict, tags=["config"])
@@ -128,3 +131,10 @@ async def backup() -> BackupResp:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"备份失败: {e}")
     return BackupResp(ok=True, backup_path=str(path))
+
+
+@router.get("/backup/list", response_model=BackupListResp, tags=["backup"])
+async def list_backups() -> BackupListResp:
+    """列出最近备份文件（config.toml，最多 10 份，按时间倒序）。"""
+    items = _config_store.list_backups()
+    return BackupListResp(backups=[BackupItem(**i) for i in items])

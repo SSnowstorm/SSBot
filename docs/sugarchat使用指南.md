@@ -41,7 +41,7 @@ AI 的人格由**提示词文件**决定。项目内置了两份场景人格（�
 | `group_prompts/default.txt` 等 | 配置目录下 | 空文件（可自定义新人格） |
 
 > 配置文件目录：`C:\Users\wangzunshi\AppData\Roaming\nonebot2\nonebot_plugin_suggarchat\`
-> 修改 `.txt` 文件后插件会**自动热重载**（无需重启 bot）；切换人格用 `/choose_prompt group/private [名字]`。
+> 修改 `.txt` 文件后插件会**自动热重载**（无需重启 bot）；切换激活人格可在**网页配置台**（管理权限 → 人格指向下拉，选项来自已有人格文件）或 QQ 内 `/choose_prompt group/private [名字]`。
 
 **自定义人格示例**（新建 `group_prompts/群聊_傲娇.txt`）：
 ```

@@ -4,91 +4,27 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SSBot AI 配置台</title>
-<style>
-:root {
-  --bg: #f5f6f8; --card: #ffffff; --border: #e0e2e6; --text: #22262b;
-  --muted: #6b7280; --accent: #2563eb; --accent-h: #1d4ed8;
-  --danger: #dc2626; --ok: #16a34a; --warn: #d97706;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
-.header { background: #fff; border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
-.header h1 { font-size: 18px; font-weight: 600; }
-.header .status { font-size: 12px; color: var(--muted); }
-.container { max-width: 960px; margin: 20px auto; padding: 0 16px; }
-.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
-.card h2 { font-size: 15px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
-.card h2 .arrow { font-size: 12px; color: var(--muted); transition: transform .2s; }
-.card.collapsed .body { display: none; }
-.card.collapsed h2 .arrow { transform: rotate(-90deg); }
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
-.tab { padding: 8px 18px; cursor: pointer; border: 1px solid transparent; border-bottom: none; border-radius: 8px 8px 0 0; color: var(--muted); }
-.tab.active { background: #fff; color: var(--accent); border-color: var(--border); font-weight: 600; }
-.tab-body { display: none; }
-.tab-body.active { display: block; }
-.row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f0f1f3; }
-.row:last-child { border-bottom: none; }
-.row label { width: 260px; flex-shrink: 0; color: var(--muted); font-size: 13px; }
-.row label .hint { display: block; font-size: 11px; color: #9ca3af; line-height: 1.5; margin-top: 2px; font-weight: 400; }
-.row input[type=text], .row input[type=number], .row select, .row textarea {
-  flex: 1; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: inherit; background: #fff;
-}
-.row textarea { min-height: 60px; resize: vertical; }
-.row input[type=text]:disabled, .row input[type=number]:disabled, .row select:disabled, .row textarea:disabled { background: #f3f4f6; color: var(--muted); }
-.row .val { flex: 1; color: var(--muted); font-size: 13px; word-break: break-all; }
-.switch { position: relative; width: 32px; height: 18px; flex-shrink: 0; }
-.switch input { opacity: 0; width: 0; height: 0; }
-.slider { position: absolute; inset: 0; background: #d1d5db; border-radius: 18px; cursor: pointer; transition: .2s; }
-.slider::before { content: ""; position: absolute; width: 12px; height: 12px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
-.switch input:checked + .slider { background: var(--accent); }
-.switch input:checked + .slider::before { transform: translateX(14px); }
-.btn { padding: 7px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; background: var(--accent); color: #fff; }
-.btn:hover { background: var(--accent-h); }
-.btn.secondary { background: #e5e7eb; color: var(--text); }
-.btn.secondary:hover { background: #d1d5db; }
-.btn.danger { background: #fee2e2; color: var(--danger); }
-.btn.danger:hover { background: #fecaca; }
-.btn.sm { padding: 4px 10px; font-size: 12px; }
-.toolbar { display: flex; gap: 8px; margin-bottom: 14px; align-items: center; }
-.msg { padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; display: none; font-size: 13px; }
-.msg.show { display: block; }
-.msg.ok { background: #dcfce7; color: var(--ok); border: 1px solid #bbf7d0; }
-.msg.err { background: #fee2e2; color: var(--danger); border: 1px solid #fecaca; }
-.prompt-list { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-.prompt-item { padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px; cursor: pointer; font-size: 13px; background: #fff; }
-.prompt-item.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-.prompt-item .del { margin-left: 6px; color: inherit; opacity: .6; cursor: pointer; }
-.prompt-item .del:hover { opacity: 1; color: var(--danger); }
-textarea.prompt-editor { width: 100%; min-height: 200px; border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-family: monospace; font-size: 13px; resize: vertical; }
-.login-box { max-width: 380px; margin: 80px auto; text-align: center; }
-.login-box h2 { margin-bottom: 20px; }
-.login-box input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 12px; font-size: 14px; }
-.chart { width: 100%; height: 240px; }
-.chart-bar { fill: var(--accent); }
-.chart-label { font-size: 11px; fill: var(--muted); }
-.grid-line { stroke: #f0f1f3; stroke-width: 1; }
-.loading { text-align: center; color: var(--muted); padding: 40px; }
-.hidden { display: none; }
-.pills { display: flex; gap: 8px; align-items: center; }
-.pill { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
-.pill.readonly { background: #f3f4f6; color: var(--muted); }
-.pill.writable { background: #dcfce7; color: var(--ok); }
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <div class="header">
-  <h1>SSBot AI 配置台</h1>
-  <div class="status" id="headerStatus">未连接</div>
+  <div class="brand">
+    <div class="logo"></div>
+    <h1>SSBot AI 配置台</h1>
+  </div>
+  <div class="badges" id="headerBadges">
+    <span class="badge muted">未连接</span>
+  </div>
 </div>
 
 <!-- 登录页 -->
-<div class="container" id="loginView">
-  <div class="login-box card">
+<div class="container login-box" id="loginView">
+  <div class="card-inner">
     <h2>AI 配置台</h2>
-    <p style="color:var(--muted);margin-bottom:16px">请输入访问口令（bot 启动时打印在控制台）</p>
+    <p>请输入访问口令（bot 启动时打印在控制台）</p>
     <input type="password" id="tokenInput" placeholder="访问口令" autocomplete="off">
-    <button class="btn" style="width:100%" onclick="login()">登录</button>
+    <button class="btn primary" onclick="login()">登录</button>
   </div>
 </div>
 
@@ -105,29 +41,61 @@ textarea.prompt-editor { width: 100%; min-height: 200px; border: 1px solid var(-
 
   <!-- 配置页 -->
   <div class="tab-body active" id="tab-config">
-    <div class="toolbar">
-      <button class="btn" onclick="loadConfig()">刷新</button>
-      <button class="btn" onclick="saveConfig()">保存全部</button>
-      <span style="color:var(--muted);font-size:12px" id="configMeta"></span>
+    <!-- 今日汇总卡 -->
+    <div class="metrics" id="todayMetrics">
+      <div class="metric">
+        <div class="l">今日调用</div>
+        <div class="v placeholder" id="mTodayCount">—</div>
+        <div class="d" id="mTodayBreakdown">加载中</div>
+      </div>
+      <div class="metric">
+        <div class="l">今日 Token</div>
+        <div class="v placeholder" id="mTodayToken">—</div>
+        <div class="d">输入 0 · 输出 0</div>
+      </div>
+      <div class="metric">
+        <div class="l">本周熔断</div>
+        <div class="v placeholder" id="mWeekBlock" title="熔断统计为 P5 任务，暂未接入">—</div>
+        <div class="d">P5 任务待接入</div>
+      </div>
     </div>
-    <div id="configGroups" class="loading">加载中...</div>
+
+    <div class="toolbar">
+      <button class="btn primary" id="saveBtn" onclick="saveConfig()">保存全部</button>
+      <button class="btn" onclick="loadConfig()">刷新</button>
+      <span class="dirty hidden" id="dirtyFlag">● 有未保存改动</span>
+      <span class="meta" id="configMeta"></span>
+    </div>
+    <div id="configGroups">
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+    </div>
   </div>
 
   <!-- 人格页 -->
   <div class="tab-body" id="tab-prompts">
     <div class="toolbar">
-      <button class="btn" onclick="switchScene('group')">群聊人格</button>
-      <button class="btn secondary" onclick="switchScene('private')">私聊人格</button>
-      <span style="color:var(--muted);font-size:12px" id="promptMeta"></span>
+      <div class="scene-tabs">
+        <div class="scene-tab active" data-scene="group" onclick="switchScene('group')">群聊人格</div>
+        <div class="scene-tab" data-scene="private" onclick="switchScene('private')">私聊人格</div>
+      </div>
+      <span class="meta" id="promptMeta"></span>
     </div>
     <div class="prompt-list" id="promptList"></div>
     <div class="row" style="border:none;padding:0 0 8px 0">
-      <input type="text" id="newPromptName" placeholder="新人格名称（中文/字母/数字/_-）" style="max-width:260px">
+      <input type="text" id="newPromptName" placeholder="新人格名称（中文/字母/数字/_-）" style="max-width:280px">
       <button class="btn sm" onclick="createPrompt()">新建</button>
     </div>
-    <textarea class="prompt-editor" id="promptEditor" placeholder="选择或新建人格后编辑内容..."></textarea>
+    <div class="prompt-editor-wrap">
+      <textarea class="prompt-editor" id="promptEditor" placeholder="选择或新建人格后编辑内容..." oninput="updatePromptStats()"></textarea>
+    </div>
+    <div class="prompt-stats">
+      <span>字数 <span class="count" id="promptCount">0 / 2000</span></span>
+      <span class="suggest-hint" id="promptHint">建议 ≤200 字以省 Token</span>
+    </div>
     <div class="toolbar" style="margin-top:10px">
-      <button class="btn" onclick="savePrompt()">保存人格</button>
+      <button class="btn primary" onclick="savePrompt()">保存人格</button>
       <button class="btn danger" onclick="deletePrompt()">删除人格</button>
     </div>
   </div>
@@ -136,7 +104,7 @@ textarea.prompt-editor { width: 100%; min-height: 200px; border: 1px solid var(-
   <div class="tab-body" id="tab-usage">
     <div class="toolbar">
       <button class="btn" onclick="loadUsage()">刷新</button>
-      <label style="color:var(--muted)">近
+      <label class="meta">近
         <select id="usageDays" onchange="loadUsage()">
           <option value="7">7 天</option>
           <option value="14">14 天</option>
@@ -144,11 +112,11 @@ textarea.prompt-editor { width: 100%; min-height: 200px; border: 1px solid var(-
         </select> 天
       </label>
     </div>
-    <div class="card">
+    <div class="chart-card">
       <h2>调用次数</h2>
       <svg class="chart" id="countChart"></svg>
     </div>
-    <div class="card">
+    <div class="chart-card">
       <h2>Token 用量</h2>
       <svg class="chart" id="tokenChart"></svg>
     </div>
@@ -156,11 +124,16 @@ textarea.prompt-editor { width: 100%; min-height: 200px; border: 1px solid var(-
 
   <!-- 备份页 -->
   <div class="tab-body" id="tab-backup">
-    <div class="card">
+    <div class="chart-card">
       <h2>配置备份</h2>
-      <p style="color:var(--muted);margin-bottom:12px">手动备份 config.toml 到 data/ai_config_console/backups/（自动保留最近 10 份）</p>
-      <button class="btn" onclick="doBackup()">立即备份</button>
-      <div id="backupResult" style="margin-top:12px"></div>
+      <p style="color:var(--text-2);font-size:13px;margin-bottom:12px">手动备份 config.toml 到 data/ai_config_console/backups/（自动保留最近 10 份）</p>
+      <button class="btn primary" onclick="doBackup()">立即备份</button>
+    </div>
+    <div class="chart-card">
+      <h2>备份历史</h2>
+      <div class="backup-list" id="backupList">
+        <div class="backup-empty">加载中...</div>
+      </div>
     </div>
   </div>
 </div>
@@ -172,6 +145,8 @@ let configData = null;
 let currentScene = 'group';
 let currentPrompt = null;
 let groups = [];
+let promptMax = 2000;
+let configDirty = false;
 
 function showMsg(text, type) {
   const el = document.getElementById('msg');
@@ -213,6 +188,7 @@ function switchTab(name) {
   if (name === 'config' && !configData) loadConfig();
   if (name === 'prompts') loadPrompts();
   if (name === 'usage') loadUsage();
+  if (name === 'backup') loadBackupList();
 }
 
 // ============ 配置页 ============
@@ -221,37 +197,50 @@ const GROUP_NAMES = {
   autoreply: '自动回复', function: '功能开关', llm: '模型参数',
   tools: '工具与安全', usage_limit: '用量限额'
 };
+
+// 三区分组（常用/进阶/管理权限）
+const GROUP_AREAS = [
+  { key: 'common', title: '常用', groups: ['model', 'function', 'session'], open: true },
+  { key: 'advanced', title: '进阶', groups: ['tools', 'usage_limit', 'autoreply'], open: false },
+  { key: 'admin', title: '管理权限', groups: ['admin', 'basic'], open: false },
+];
+
+// 省 Token 建议项（A1~A7 中落在配置页的项；A7 人格文件走人格页字数提示）
+const SUGGEST = {
+  enable_report: { text: '推荐关闭', done: v => v === false },
+  report_exclude_system_prompt: { text: '推荐开启', done: v => v === true },
+  report_exclude_context: { text: '推荐开启', done: v => v === true },
+  poke_reply: { text: '推荐关闭', done: v => v === false },
+  synthesize_forward_message: { text: '推荐关闭', done: v => v === false },
+  memory_lenth_limit: { text: '推荐 ≤30', done: v => v <= 30 },
+  max_tokens: { text: '推荐 ≤500', done: v => v <= 500 },
+};
+
 const FIELD_META = {
-  // basic
   enable: { label: '启用', desc: '插件总开关，关闭后 AI 不再响应', example: 'true' },
   parse_segments: { label: '解析消息段', desc: '将消息按 CQ 码解析为结构化段（图片/引用等）', example: 'true' },
   matcher_function: { label: '钩子功能', desc: '启用 on_before_chat/on_chat 等钩子（本系统注入防护依赖此开关）', example: 'true' },
   preset: { label: '预设名', desc: '当前使用的模型预设名', example: 'default' },
-  group_prompt_character: { label: '群人格指向', desc: '群聊使用的人格文件（group_prompts/ 下的文件名，不含扩展名）', example: '群聊_默认' },
-  private_prompt_character: { label: '私聊人格指向', desc: '私聊使用的人格文件（private_prompts/ 下的文件名）', example: '私聊_默认' },
-  // model
+  group_prompt_character: { label: '群人格指向', desc: '群聊使用的人格文件名（不含扩展名）', example: '群聊_默认' },
+  private_prompt_character: { label: '私聊人格指向', desc: '私聊使用的人格文件名', example: '私聊_默认' },
   model: { label: '模型', desc: '对话使用的模型名（DeepSeek 可选 deepseek-chat / deepseek-reasoner）', example: 'deepseek-chat' },
   base_url: { label: 'API 地址', desc: 'OpenAI 兼容接口地址', example: 'https://api.deepseek.com' },
   api_key: { label: 'API Key', desc: '只读展示，密钥来自 .env.dev 的 DEEPSEEK_API_KEY', example: 'sk-****后4位' },
   protocol: { label: '协议', desc: '内部协议标识，勿改', example: '__main__' },
   thought_chain_model: { label: '思维链', desc: '是否启用思维链模型（个人场景一般不用）', example: 'false' },
   multimodal: { label: '多模态', desc: '是否启用多模态（当前模型不支持）', example: 'false' },
-  // admin
   admins: { label: '管理员 QQ 号', desc: '插件级管理员（与 SUPERUSERS 取并集），逗号分隔', example: '2232117623,10001' },
   admin_group: { label: '管理员群 ID', desc: '指定管理员所在群，0 表示不限定', example: '0' },
   allow_send_to_admin: { label: '允许私发管理员', desc: '允许向管理员私发消息（异常上报等）', example: 'false' },
-  // session
   session_control: { label: '会话自动控制', desc: '按时间窗口自动管理会话上下文', example: 'false' },
   session_control_time: { label: '会话窗口（秒）', desc: '窗口内消息算同一会话', example: '60' },
   session_control_history: { label: '窗口保留条数', desc: '窗口内最多保留的消息条数', example: '10' },
   session_max_tokens: { label: '会话累计 Token 上限', desc: '会话累计 token 超限后自动清理', example: '5000' },
-  // autoreply
   enable: { label: '启用', desc: '自动回复总开关（概率冒泡）', example: 'false' },
   global_enable: { label: '全局启用', desc: '全部群统一启用自动回复', example: 'false' },
   probability: { label: '触发概率', desc: '0~1，未 at 时主动冒泡的概率', example: '0.01' },
   keywords: { label: '触发关键词', desc: '命中关键词即触发回复，逗号分隔', example: 'at,你好' },
   keywords_mode: { label: '匹配模式', desc: 'starts_with=前缀匹配；contains=包含匹配', example: 'starts_with' },
-  // function
   chat_pending_mode: { label: '排队模式', desc: '多请求时排队（queue）或丢弃（drop）', example: 'queue' },
   synthesize_forward_message: { label: '合并转发展开', desc: '把合并转发内容展开进上下文（省 token 可关）', example: 'true' },
   nature_chat_style: { label: '自然聊天风格', desc: '按句切分多条发送，模拟真人打字', example: 'true' },
@@ -262,7 +251,6 @@ const FIELD_META = {
   use_user_nickname: { label: '使用用户昵称', desc: '回复中称呼用户昵称', example: 'false' },
   chat_object_keep_count: { label: '聊天对象保留数', desc: '保留最近 N 个聊天对象的会话', example: '10' },
   nature_chat_cut_pattern: { label: '切句正则', desc: '按此正则切分回复为多条，改错影响发送', example: '([。！？!?;；\\n]+)' },
-  // llm
   stream: { label: '流式输出', desc: '流式生成（体验更顺滑）', example: 'false' },
   memory_lenth_limit: { label: '历史消息条数', desc: '发给模型的历史消息上限，越小越省 token', example: '20' },
   max_tokens: { label: '输出上限', desc: '单次回复最大 token 数', example: '500' },
@@ -274,7 +262,6 @@ const FIELD_META = {
   enable_memory_abstract: { label: '记忆摘要', desc: '超长会话自动生成摘要（兜底长程记忆）', example: 'true' },
   memory_abstract_proportion: { label: '摘要比例', desc: '达到历史长度多少比例时触发摘要', example: '0.15' },
   block_msg: { label: '熔断兜底文案', desc: '内容检查熔断时回复的文案，每行一条', example: '你好，这个问题我暂时无法处理。' },
-  // tools
   enable_tools: { label: '工具总开关', desc: '无自定义工具时应保持关闭，否则模型会"假装用工具"复读', example: 'false' },
   use_minimal_context: { label: '最小上下文', desc: '工具调用时只带最小上下文', example: 'true' },
   enable_report: { label: '内容安全检查', desc: '每条消息额外一次 LLM 检查（最大的省 token 点）', example: 'true' },
@@ -287,7 +274,6 @@ const FIELD_META = {
   agent_tool_call_limit: { label: '工具调用上限', desc: 'Agent 单轮最多调用工具次数', example: '10' },
   agent_thought_mode: { label: '思考模式', desc: 'chat/reasoning/reasoning-required', example: 'chat' },
   agent_mcp_client_enable: { label: 'MCP 客户端', desc: '启用 MCP 客户端（需先配置脚本）', example: 'false' },
-  // usage_limit
   enable_usage_limit: { label: '用量限额开关', desc: '烧钱保险丝：开启后按以下阈值限制', example: 'true' },
   group_daily_limit: { label: '单群每日次数', desc: '单群每天最多调用次数', example: '100' },
   user_daily_limit: { label: '单用户每日次数', desc: '单用户每天最多调用次数', example: '100' },
@@ -298,27 +284,72 @@ const FIELD_META = {
   global_insights_expire_days: { label: '用量保留天数', desc: '用量统计保留天数', example: '7' }
 };
 
+async function loadPromptLists() {
+  // 预加载人格列表，供配置页"群人格指向/私聊人格指向"下拉使用
+  try {
+    const [g, p] = await Promise.all([
+      api('/prompts/group').catch(() => ({ prompts: [] })),
+      api('/prompts/private').catch(() => ({ prompts: [] })),
+    ]);
+    window.promptLists = { group: g.prompts || [], private: p.prompts || [] };
+  } catch (e) {
+    window.promptLists = { group: [], private: [] };
+  }
+}
+
 async function loadConfig() {
   try {
     const data = await api('/config');
     configData = data;
+    await loadPromptLists();
     renderConfig();
-    document.getElementById('configMeta').textContent = '已加载';
+    document.getElementById('configMeta').textContent = '已加载 ' + new Date().toLocaleTimeString();
+    clearDirty();
   } catch (e) { showMsg('加载配置失败: ' + e.message, 'err'); }
+}
+
+function countSuggestTodo(groupKey) {
+  const g = configData[groupKey];
+  if (!g) return 0;
+  return Object.entries(g).filter(([k, v]) => SUGGEST[k] && !SUGGEST[k].done(v.value)).length;
 }
 
 function renderConfig() {
   const wrap = document.getElementById('configGroups');
   if (!configData) { wrap.innerHTML = '<div class="loading">无数据</div>'; return; }
   groups = Object.keys(configData);
-  wrap.innerHTML = groups.map(g => {
-    const title = GROUP_NAMES[g] || g;
-    const fields = Object.entries(configData[g]).map(([k, v]) => renderField(g, k, v)).join('');
-    return `<div class="card" data-group="${g}">
-      <h2 onclick="toggleGroup(this)"><span>${title}</span><span class="arrow">▼</span></h2>
-      <div class="body">${fields}</div>
+
+  wrap.innerHTML = GROUP_AREAS.map(area => {
+    const areaTodo = area.groups.reduce((s, g) => s + countSuggestTodo(g), 0);
+    const areaBadge = areaTodo > 0 ? `<span class="badge sug-todo">${areaTodo} 项省 Token 建议</span>` : '';
+    const collapsed = area.open ? '' : ' collapsed';
+    const groupsHtml = area.groups.filter(g => configData[g]).map(g => {
+      const title = GROUP_NAMES[g] || g;
+      const todo = countSuggestTodo(g);
+      const gBadge = todo > 0 ? `<span class="badge sug-todo">${todo}</span>` : '';
+      const fields = Object.entries(configData[g]).map(([k, v]) => renderField(g, k, v)).join('');
+      return `<div class="group" data-group="${g}">
+        <div class="group-head" onclick="toggleGroup(this)"><span class="gname">${title}</span>${gBadge}<span class="garrow">▼</span></div>
+        <div class="group-body">${fields}</div>
+      </div>`;
+    }).join('');
+    return `<div class="area${collapsed}" data-area="${area.key}">
+      <div class="area-head" onclick="toggleArea(this)"><span class="area-title">${area.title}</span>${areaBadge}<span class="area-arrow">▼</span></div>
+      <div class="area-body">${groupsHtml}</div>
     </div>`;
   }).join('');
+
+  // 脏数据监听 + 标签输入交互（事件委托）
+  wrap.addEventListener('input', e => {
+    if (e.target.classList && e.target.classList.contains('tag-input')) return;
+    markDirty();
+  });
+  wrap.addEventListener('change', e => {
+    if (e.target.classList && e.target.classList.contains('tag-input')) return;
+    markDirty();
+  });
+  wrap.addEventListener('keydown', handleTagKeydown);
+  wrap.addEventListener('focusout', handleTagBlur);
 }
 
 function renderField(group, key, v) {
@@ -329,40 +360,83 @@ function renderField(group, key, v) {
   const editable = v && v.editable;
   const value = v && v.value;
   const ro = editable === false ? ' disabled' : '';
-  const pill = editable === false ? '<span class="pill readonly">只读</span>' : '<span class="pill writable">可写</span>';
-  const hint = `<span class="hint">${desc ? desc + '；示例: ' + example : key}</span>`;
+  const keyHtml = `<span class="key">${key}</span>`;
+  const hint = `<span class="hn">${desc ? desc + '；示例: ' + example : key}</span>`;
+
+  // 省 Token 建议徽标
+  const sug = SUGGEST[key];
+  let sugBadge = '';
+  if (sug && editable !== false) {
+    const isDone = sug.done(value);
+    sugBadge = isDone
+      ? '<span class="badge sug-done">已优化</span>'
+      : `<span class="badge sug-todo">${sug.text}</span>`;
+  }
+
   let input = '';
   if (typeof value === 'boolean') {
-    input = `<label class="switch"><input type="checkbox" data-group="${group}" data-key="${key}" ${value ? 'checked' : ''}${ro}><span class="slider"></span></label>${pill}`;
+    input = `<label class="switch"><input type="checkbox" data-group="${group}" data-key="${key}" ${value ? 'checked' : ''}${ro}><span class="slider"></span></label>`;
   } else if (typeof value === 'number') {
     input = `<input type="number" data-group="${group}" data-key="${key}" value="${value}"${ro} placeholder="${example}">`;
   } else if (Array.isArray(value)) {
-    input = `<input type="text" data-group="${group}" data-key="${key}" value="${value.join(',')}"${ro} placeholder="${example}" title="逗号分隔">`;
+    if (key === 'admins' || key === 'keywords') {
+      input = renderTagInput(group, key, value, ro);
+    } else {
+      input = `<textarea data-group="${group}" data-key="${key}"${ro} placeholder="${example}（每行一条）">${value.join('\n')}</textarea>`;
+    }
+  } else if (key === 'group_prompt_character' || key === 'private_prompt_character') {
+    // 人格指向：渲染为下拉框，选项来自人格页已有文件（防手打拼错）
+    const scene = key === 'group_prompt_character' ? 'group' : 'private';
+    const list = (window.promptLists && window.promptLists[scene]) || [];
+    const opts = list.map(p => {
+      const sel = String(value) === p.name ? ' selected' : '';
+      return `<option value="${p.name}"${sel}>${p.name}</option>`;
+    }).join('');
+    input = `<select data-group="${group}" data-key="${key}"${ro}>${opts || '<option value="">（暂无，请先在人格页创建）</option>'}</select>`;
   } else {
     const isLong = String(value).length > 40;
     if (isLong) input = `<textarea data-group="${group}" data-key="${key}"${ro} placeholder="${example}">${value}</textarea>`;
     else input = `<input type="text" data-group="${group}" data-key="${key}" value="${value}"${ro} placeholder="${example}">`;
   }
-  return `<div class="row"><label>${label}${hint}</label>${input}</div>`;
+  return `<div class="row"><div class="lbl"><div class="ln">${label}${keyHtml}</div>${hint}</div><div class="controls">${sugBadge}${input}</div></div>`;
 }
 
-function toggleGroup(el) { el.closest('.card').classList.toggle('collapsed'); }
+function toggleArea(el) { el.closest('.area').classList.toggle('collapsed'); }
+function toggleGroup(el) { el.closest('.group').classList.toggle('collapsed'); }
+
+function markDirty() {
+  if (!configDirty) {
+    configDirty = true;
+    document.getElementById('dirtyFlag').classList.remove('hidden');
+  }
+}
+function clearDirty() {
+  configDirty = false;
+  document.getElementById('dirtyFlag').classList.add('hidden');
+}
 
 function collectConfig() {
   const out = {};
   groups.forEach(g => {
     out[g] = {};
-    document.querySelectorAll(`[data-group="${g}"]`).forEach(el => {
+    document.querySelectorAll(`#configGroups [data-group="${g}"]`).forEach(el => {
       const key = el.dataset.key;
+      if (el.classList.contains('tagbox')) {
+        const isNum = el.dataset.num === 'true';
+        let arr = [...el.querySelectorAll('.tag')].map(t => t.dataset.val);
+        if (isNum) arr = arr.map(Number);
+        out[g][key] = arr;
+        return;
+      }
       if (el.disabled) return;
       let val;
       if (el.type === 'checkbox') val = el.checked;
       else if (el.type === 'number') val = el.value === '' ? null : Number(el.value);
+      else if (el.tagName === 'SELECT') val = el.value;
       else if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
         val = el.value;
-        if (key === 'admins' || key === 'keywords' || key === 'block_msg') {
-          val = el.value.split(/[,，\n]/).map(s => s.trim()).filter(Boolean);
-          if (key === 'admins') val = val.map(Number);
+        if (key === 'block_msg') {
+          val = el.value.split(/\n/).map(s => s.trim()).filter(Boolean);
         }
       }
       if (val !== null && val !== undefined) out[g][key] = val;
@@ -371,13 +445,98 @@ function collectConfig() {
   return out;
 }
 
+function renderTagInput(group, key, value, ro) {
+  const isNum = key === 'admins';
+  const ph = isNum ? '输入QQ号，回车添加' : '输入关键词，回车添加';
+  const tags = (value || []).map(v =>
+    `<span class="tag" data-val="${v}"><span class="tag-text">${v}</span><span class="tag-x" onclick="removeTag(this)">×</span></span>`
+  ).join('');
+  return `<div class="tagbox" data-group="${group}" data-key="${key}" data-num="${isNum}">${tags}<input type="text" class="tag-input" placeholder="${ph}"${ro ? ' disabled' : ''}></div><div class="tag-msg"></div>`;
+}
+
+function addTag(input) {
+  const box = input.closest('.tagbox');
+  if (!box) return;
+  const msg = box.nextElementSibling && box.nextElementSibling.classList.contains('tag-msg') ? box.nextElementSibling : null;
+  const isNum = box.dataset.num === 'true';
+  const raw = input.value.trim().replace(/[,，\s]+$/g, '').trim();
+  if (!raw) { input.value = ''; return; }
+  if (isNum && !/^\d+$/.test(raw)) {
+    if (msg) { msg.textContent = '应为纯数字'; msg.className = 'tag-msg err'; }
+    input.value = ''; return;
+  }
+  const existing = [...box.querySelectorAll('.tag')].map(t => t.dataset.val);
+  if (existing.includes(raw)) {
+    if (msg) { msg.textContent = raw + ' 已存在'; msg.className = 'tag-msg err'; }
+    input.value = ''; return;
+  }
+  const tag = document.createElement('span');
+  tag.className = 'tag';
+  tag.dataset.val = raw;
+  tag.innerHTML = `<span class="tag-text">${raw}</span><span class="tag-x" onclick="removeTag(this)">×</span>`;
+  box.insertBefore(tag, input);
+  input.value = '';
+  if (msg) {
+    msg.textContent = '已添加 ' + raw + '，当前 ' + box.querySelectorAll('.tag').length + ' 个';
+    msg.className = 'tag-msg ok';
+    setTimeout(() => { msg.textContent = ''; msg.className = 'tag-msg'; }, 2000);
+  }
+  markDirty();
+}
+
+function removeTag(x) {
+  const tag = x.closest('.tag');
+  if (tag) { tag.remove(); markDirty(); }
+}
+
+function handleTagKeydown(e) {
+  const input = e.target;
+  if (!input.classList || !input.classList.contains('tag-input')) return;
+  if (e.key === 'Enter' || e.key === ',' || e.key === '，') {
+    e.preventDefault();
+    addTag(input);
+  } else if (e.key === 'Backspace' && input.value === '') {
+    const box = input.closest('.tagbox');
+    const last = box && box.querySelector('.tag:last-of-type');
+    if (last) { last.remove(); markDirty(); }
+  }
+}
+
+function handleTagBlur(e) {
+  const input = e.target;
+  if (!input.classList || !input.classList.contains('tag-input')) return;
+  addTag(input);
+}
+
 async function saveConfig() {
+  const btn = document.getElementById('saveBtn');
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>保存中';
   try {
     const payload = collectConfig();
     const resp = await api('/config', { method: 'PUT', body: JSON.stringify(payload) });
     showMsg('配置已保存（已备份: ' + resp.backup_path.split(/[\\/]/).pop() + '）', 'ok');
-    loadConfig();
-  } catch (e) { showMsg('保存失败: ' + e.message, 'err'); }
+    await loadConfig();
+  } catch (e) {
+    showMsg('保存失败: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origText;
+  }
+}
+
+// ============ 今日汇总 ============
+function updateTodayMetrics(usageData) {
+  const today = usageData.daily[usageData.daily.length - 1] || {};
+  const c = document.getElementById('mTodayCount');
+  const t = document.getElementById('mTodayToken');
+  c.textContent = today.count || 0;
+  c.classList.remove('placeholder');
+  const tk = (today.token_input || 0) + (today.token_output || 0);
+  t.textContent = tk >= 1000 ? (tk / 1000).toFixed(1) + 'k' : tk;
+  t.classList.remove('placeholder');
+  document.getElementById('mTodayBreakdown').textContent = `输入 ${today.token_input || 0} · 输出 ${today.token_output || 0}`;
 }
 
 // ============ 人格页 ============
@@ -389,7 +548,7 @@ async function loadPrompts() {
       const active = currentPrompt === p.name ? ' active' : '';
       return `<span class="prompt-item${active}" onclick="selectPrompt('${p.name}')">${p.name}
         <span class="del" onclick="event.stopPropagation();removePrompt('${p.name}')">×</span></span>`;
-    }).join('') || '<span style="color:var(--muted)">暂无人格</span>';
+    }).join('') || '<span style="color:var(--text-3)">暂无人格</span>';
     document.getElementById('promptMeta').textContent = currentScene === 'group' ? '群聊人格' : '私聊人格';
   } catch (e) { showMsg('加载人格失败: ' + e.message, 'err'); }
 }
@@ -397,10 +556,9 @@ async function loadPrompts() {
 function switchScene(scene) {
   currentScene = scene;
   currentPrompt = null;
-  document.querySelectorAll('#tab-prompts .toolbar .btn').forEach((b, i) => {
-    b.classList.toggle('secondary', (scene === 'group') !== (i === 0));
-  });
+  document.querySelectorAll('.scene-tab').forEach(t => t.classList.toggle('active', t.dataset.scene === scene));
   document.getElementById('promptEditor').value = '';
+  updatePromptStats();
   loadPrompts();
 }
 
@@ -409,6 +567,7 @@ async function selectPrompt(name) {
   try {
     const data = await api(`/prompts/${currentScene}/${encodeURIComponent(name)}`);
     document.getElementById('promptEditor').value = data.content;
+    updatePromptStats();
     loadPrompts();
   } catch (e) { showMsg('读取人格失败: ' + e.message, 'err'); }
 }
@@ -421,6 +580,7 @@ async function createPrompt() {
     document.getElementById('newPromptName').value = '';
     currentPrompt = name;
     document.getElementById('promptEditor').value = '';
+    updatePromptStats();
     loadPrompts();
     showMsg('人格已创建，可编辑内容', 'ok');
   } catch (e) { showMsg('创建失败: ' + e.message, 'err'); }
@@ -429,6 +589,7 @@ async function createPrompt() {
 async function savePrompt() {
   if (!currentPrompt) { showMsg('请先选择或创建人格', 'err'); return; }
   const content = document.getElementById('promptEditor').value;
+  if (content.length > promptMax) { showMsg(`内容超过 ${promptMax} 字上限`, 'err'); return; }
   try {
     await api(`/prompts/${currentScene}/${encodeURIComponent(currentPrompt)}`, { method: 'PUT', body: JSON.stringify({ content }) });
     showMsg('人格已保存', 'ok');
@@ -440,7 +601,7 @@ async function removePrompt(name) {
   if (!confirm(`确认删除人格「${name}」？`)) return;
   try {
     await api(`/prompts/${currentScene}/${encodeURIComponent(name)}`, { method: 'DELETE' });
-    if (currentPrompt === name) { currentPrompt = null; document.getElementById('promptEditor').value = ''; }
+    if (currentPrompt === name) { currentPrompt = null; document.getElementById('promptEditor').value = ''; updatePromptStats(); }
     loadPrompts();
     showMsg('人格已删除', 'ok');
   } catch (e) { showMsg('删除失败: ' + e.message, 'err'); }
@@ -451,10 +612,22 @@ async function deletePrompt() {
   await removePrompt(currentPrompt);
 }
 
+function updatePromptStats() {
+  const content = document.getElementById('promptEditor').value;
+  const len = content.length;
+  const el = document.getElementById('promptCount');
+  el.textContent = `${len} / ${promptMax}`;
+  el.className = 'count' + (len > promptMax ? ' over' : (len > 200 ? ' warn-count' : ''));
+  const hint = document.getElementById('promptHint');
+  if (len > promptMax) hint.textContent = `超出 ${promptMax} 字上限，无法保存`;
+  else if (len > 200) hint.textContent = '超出省 Token 建议值（≤200 字）';
+  else hint.textContent = '建议 ≤200 字以省 Token';
+}
+
 // ============ 用量页 ============
-function drawChart(svgId, data, labelFn, color) {
+function drawChart(svgId, data, labelFn, color, todayColor) {
   const svg = document.getElementById(svgId);
-  const W = svg.clientWidth || 900, H = 240, pad = { l: 40, r: 10, t: 20, b: 24 };
+  const W = svg.clientWidth || 900, H = 240, pad = { l: 40, r: 10, t: 20, b: 28 };
   const max = Math.max(...data.map(d => d.value), 1);
   const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
   const bw = iw / data.length;
@@ -465,12 +638,14 @@ function drawChart(svgId, data, labelFn, color) {
     html += `<text class="chart-label" x="${pad.l - 6}" y="${y + 4}" text-anchor="end">${Math.round(max * i / 4)}</text>`;
   }
   data.forEach((d, i) => {
+    const isToday = i === data.length - 1;
     const h = d.value === 0 ? 2 : Math.max(ih * d.value / max, 2);
     const x = pad.l + i * bw + bw * 0.15;
     const y = pad.t + ih - h;
-    html += `<rect class="chart-bar" x="${x}" y="${y}" width="${bw * 0.7}" height="${h}" rx="2" fill="${color}"/>`;
-    html += `<text class="chart-label" x="${x + bw * 0.35}" y="${H - 6}" text-anchor="middle">${labelFn(d)}</text>`;
-    if (d.value > 0) html += `<text class="chart-label" x="${x + bw * 0.35}" y="${y - 4}" text-anchor="middle">${d.value}</text>`;
+    const cls = isToday ? 'chart-bar today' : 'chart-bar';
+    html += `<rect class="${cls}" x="${x}" y="${y}" width="${bw * 0.7}" height="${h}" rx="2" fill="${isToday ? todayColor : color}"/>`;
+    html += `<text class="chart-label" x="${x + bw * 0.35}" y="${H - 8}" text-anchor="middle">${labelFn(d)}</text>`;
+    if (d.value > 0) html += `<text class="chart-value" x="${x + bw * 0.35}" y="${y - 4}" text-anchor="middle">${d.value}</text>`;
   });
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   svg.innerHTML = html;
@@ -480,8 +655,9 @@ async function loadUsage() {
   try {
     const days = document.getElementById('usageDays').value;
     const data = await api('/usage?days=' + days);
-    drawChart('countChart', data.daily.map(d => ({ label: d.date.slice(5), value: d.count })), d => d.label, '#2563eb');
-    drawChart('tokenChart', data.daily.map(d => ({ label: d.date.slice(5), value: d.token_input + d.token_output })), d => d.label, '#7c3aed');
+    updateTodayMetrics(data);
+    drawChart('countChart', data.daily.map(d => ({ label: d.date.slice(5), value: d.count })), d => d.label, '#185fa5', '#378add');
+    drawChart('tokenChart', data.daily.map(d => ({ label: d.date.slice(5), value: d.token_input + d.token_output })), d => d.label, '#534ab7', '#7f77dd');
   } catch (e) { showMsg('加载用量失败: ' + e.message, 'err'); }
 }
 
@@ -489,9 +665,23 @@ async function loadUsage() {
 async function doBackup() {
   try {
     const resp = await api('/backup', { method: 'POST' });
-    document.getElementById('backupResult').innerHTML =
-      `<div class="msg show ok">备份成功: ${resp.backup_path.split(/[\\/]/).pop()}</div>`;
+    showMsg('备份成功: ' + resp.backup_path.split(/[\\/]/).pop(), 'ok');
+    loadBackupList();
   } catch (e) { showMsg('备份失败: ' + e.message, 'err'); }
+}
+
+async function loadBackupList() {
+  const wrap = document.getElementById('backupList');
+  try {
+    const data = await api('/backup/list');
+    if (!data.backups.length) { wrap.innerHTML = '<div class="backup-empty">暂无备份</div>'; return; }
+    wrap.innerHTML = data.backups.map(b => `
+      <div class="backup-item">
+        <span class="fname">${b.name}</span>
+        <span class="fsize">${(b.size / 1024).toFixed(1)} KB</span>
+        <span class="ftime">${b.updated}</span>
+      </div>`).join('');
+  } catch (e) { wrap.innerHTML = '<div class="backup-empty">加载失败</div>'; }
 }
 
 // ============ 初始化 ============
@@ -499,11 +689,17 @@ async function init() {
   if (!token) { document.getElementById('loginView').classList.remove('hidden'); return; }
   try {
     const st = await api('/status');
-    document.getElementById('headerStatus').textContent =
-      '已连接 · ' + (st.suggarchat_loaded ? 'suggarchat 已加载' : 'suggarchat 未加载') + ' · v' + st.version;
+    if (st.prompt_max_length) promptMax = st.prompt_max_length;
+    document.getElementById('headerBadges').innerHTML =
+      `<span class="badge ok">已连接</span>` +
+      `<span class="badge ${st.suggarchat_loaded ? 'ok' : 'warn'}">${st.suggarchat_loaded ? 'suggarchat 已加载' : 'suggarchat 未加载'}</span>` +
+      `<span class="badge muted">v${st.version}</span>` +
+      `<span class="badge muted">人格上限 ${promptMax} 字</span>`;
+    document.getElementById('promptCount').textContent = `0 / ${promptMax}`;
     document.getElementById('loginView').classList.add('hidden');
     document.getElementById('mainView').classList.remove('hidden');
     loadConfig();
+    loadUsage();
   } catch (e) {
     if (e.message !== '401') showMsg('连接失败: ' + e.message, 'err');
   }

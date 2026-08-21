@@ -7,14 +7,18 @@
 - 鉴权：X-AI-Config-Token 请求头，token 启动时自动生成并打印到控制台
 """
 
+import os
+
 from nonebot import get_driver, logger
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
 from . import _guard  # noqa: F401  （导入即注册 run_preprocessor 守卫）
 from . import _inject_guard  # noqa: F401  （导入即注册注入拦截钩子）
+from . import _dad_guard  # noqa: F401  （导入即注册爸爸身份注入钩子）
 from ._auth import generate_token, set_token
 from ._api import router
+from ._models import set_prompt_max
 
 # 子模块以下划线开头，避免被 NoneBot 扫描为独立插件
 __all__ = []
@@ -47,3 +51,15 @@ async def _init_token() -> None:
     set_token(token)
     logger.info("[ai_config_console] 管理系统访问口令: {}", token)
     logger.info("[ai_config_console] 浏览器打开 http://127.0.0.1:8080/ai-config/ 使用")
+
+
+@driver.on_startup
+async def _init_prompt_max() -> None:
+    """读取人格字数上限环境变量（默认 2000，可通过 AI_PROMPT_MAX_LENGTH 配置）。"""
+    val = os.getenv("AI_PROMPT_MAX_LENGTH", "2000")
+    try:
+        n = int(val)
+    except (TypeError, ValueError):
+        n = 2000
+    set_prompt_max(n)
+    logger.info("[ai_config_console] 人格字数上限: {} 字", n)
