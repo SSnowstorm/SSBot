@@ -1,6 +1,7 @@
 # plugins/interactive_help/config.py
 """帮助菜单配置加载与管理。"""
 
+import os
 from pathlib import Path
 
 import yaml
@@ -8,9 +9,17 @@ from nonebot.log import logger
 
 from ._models import HelpMenuRootConfig
 
-
 PLUGIN_DIR = Path(__file__).parent
 DEFAULT_CONFIG_PATH = PLUGIN_DIR / "data" / "help_menu.yaml"
+
+# 是否使用 json 卡片渲染帮助菜单。
+# 默认关闭：个人号协议端（NapCat / Lagrange）不渲染 json 卡片，只会显示占位文本；
+# 官方渠道机器人可设 HELP_USE_CARD=true 开启卡片外观。
+_TRUE_VALUES = {"1", "true", "yes", "on"}
+
+
+def _env_use_card() -> bool:
+    return os.getenv("HELP_USE_CARD", "false").strip().lower() in _TRUE_VALUES
 
 
 class ConfigManager:
@@ -52,6 +61,11 @@ class ConfigManager:
     @property
     def permissions(self):
         return self.config.permissions
+
+    @property
+    def use_card(self) -> bool:
+        """是否用 json 卡片渲染（默认 False，走纯文本）。"""
+        return _env_use_card()
 
 
 # 模块级单例，插件加载时初始化

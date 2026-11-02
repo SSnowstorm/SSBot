@@ -25,11 +25,14 @@ driver = nonebot.get_driver()
 driver.register_adapter(ONEBOT_V11Adapter)
 
 # 加载插件
+# 注意顺序: ai_config_console 的注入/身份钩子依赖 suggarchat 已加载,
+# 必须先 load suggarchat, 再 load ai_config_console (见 docs/缺陷修复记录.md 第 3 章).
 nonebot.load_plugins("src/plugins/plugin_nonebot_rand_qinghua")
 nonebot.load_plugins("src/plugins/jm_downloader")
 nonebot.load_plugins("src/plugins/get_group_info")
 nonebot.load_plugin("src.plugins.interactive_help")
 nonebot.load_plugin("src.plugins.sv_card")
+nonebot.load_plugin("src.plugins.tic_tac_toe")  # 井字棋（D-05 修复：此前漏加载）
 nonebot.load_plugin("nonebot_plugin_suggarchat")  # AI 聊天（SuggarChat）
 nonebot.load_plugin("src.plugins.ai_config_console")  # SuggarChat 管理系统（AI 配置台）
 # nonebot.load_plugins("src/plugins/plugin_nonebot_jmcomic")  # 配置路径未指定，暂不加载

@@ -6,17 +6,27 @@
     /sv #<职业>        按职业过滤
     /sv !<ID>          按卡牌ID精确查询
     /sv_reload         重新加载卡牌数据
+
+发送策略（D-08 修复）：
+- 单卡结果 / ID 查询：文本详情 + 卡图（shadowverse-portal 直链）
+- 多结果列表：纯文本 + 提示"用 /sv !<ID> 看单卡大图"（避免一次刷屏 10 张图）
+- 图片发送失败（协议端下载失败/URL 不可达）：自动退回纯文本并附图片直链
 """
 
 import re
 from typing import Optional
 
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import Bot, MessageEvent
+from nonebot.adapters.onebot.v11 import Bot, Message, MessageEvent, MessageSegment
 from nonebot.log import logger
 
 from ._cache import card_cache, reload_cards
-from ._formatter import format_card_list, format_single_card, format_search_results
+from ._formatter import (
+    format_card_list,
+    format_search_results,
+    format_single_card,
+    get_card_image_url,
+)
 from ._searcher import search_cards
 
 
@@ -60,6 +70,30 @@ def _extract_keyword(event: MessageEvent) -> str:
         return m.group(1).strip()
     # 兜底：没匹配上时返回原文（便于排错）
     return raw
+
+
+# ============== 发送 ==============
+
+async def _send_text(bot: Bot, event: MessageEvent, text: str) -> None:
+    await bot.send(event=event, message=text)
+
+
+async def _send_card(bot: Bot, event: MessageEvent, card: dict, text: str) -> None:
+    """发送"文本 + 卡图"；图片失败时退回纯文本并附直链。"""
+    url = get_card_image_url(card)
+    if url:
+        try:
+            await bot.send(
+                event=event,
+                message=Message(text) + MessageSegment.image(url),
+            )
+            return
+        except Exception as e:
+            logger.warning(
+                f"[sv_card] 卡片图片发送失败（id={card.get('id')}），退回纯文本: {e}"
+            )
+            text = f"{text}\n（图片发送失败，可直接访问：{url}）"
+    await _send_text(bot, event, text)
 
 
 # ============== 命令处理 ==============
@@ -123,7 +157,7 @@ async def _send_help(bot: Bot, event: MessageEvent):
 【命令格式】
     /sv <关键词>       模糊搜索卡片
     /sv #<职业>        按职业过滤
-    /sv !<ID>          按卡牌ID精确查询
+    /sv !<ID>          按卡牌ID精确查询（含卡图）
     /sv <ID>           直接输入7-8位ID也可查询（不加!也行）
     /sv_reload         重新加载数据
 
@@ -138,10 +172,11 @@ async def _send_help(bot: Bot, event: MessageEvent):
 
 【说明】
 - 卡牌数据：简体中文翻译版（735 张，来源：自制翻译引擎）
+- 单卡查询会附卡图；列表结果回复 /sv !<ID> 可看单卡大图
 - 技能文本若含日文残留会自动附原文对照
 - 风味文本暂不展示（翻译质量待优化）
 """
-    await bot.send(event=event, message=help_text)
+    await _send_text(bot, event, help_text)
 
 
 async def _handle_id_query(bot: Bot, event: MessageEvent, card_id: str):
@@ -149,15 +184,10 @@ async def _handle_id_query(bot: Bot, event: MessageEvent, card_id: str):
     card = card_cache.get_card_by_id(card_id)
 
     if not card:
-        await bot.send(
-            event=event,
-            message=f"❌ 未找到ID为 {card_id} 的卡牌。",
-        )
+        await _send_text(bot, event, f"❌ 未找到ID为 {card_id} 的卡牌。")
         return
 
-    msg = format_single_card(card)
-    await bot.send(event=event, message=msg)
-    # TODO: 发送卡片图片
+    await _send_card(bot, event, card, format_single_card(card))
 
 
 async def _handle_class_filter(bot: Bot, event: MessageEvent, class_filter: str):
@@ -166,18 +196,16 @@ async def _handle_class_filter(bot: Bot, event: MessageEvent, class_filter: str)
     filtered = search_cards(class_filter, cards, class_filter_only=True)
 
     if not filtered:
-        await bot.send(
-            event=event,
-            message=f"❌ 未找到职业「{class_filter}」的卡牌。",
-        )
+        await _send_text(bot, event, f"❌ 未找到职业「{class_filter}」的卡牌。")
         return
 
     # 限制返回数量
     results = filtered[:10]
-    msg = format_search_results(results, class_filter)
+    msg = format_search_results(results, f"#{class_filter}")
+    if len(results) > 1:
+        msg += "\n\n（回复 /sv !<ID> 查看单卡详情与卡图）"
 
-    await bot.send(event=event, message=msg)
-    # TODO: 发送卡片图片列表
+    await _send_text(bot, event, msg)
 
 
 async def _handle_search(bot: Bot, event: MessageEvent, keyword: str):
@@ -186,19 +214,15 @@ async def _handle_search(bot: Bot, event: MessageEvent, keyword: str):
     results = search_cards(keyword, cards)
 
     if not results:
-        await bot.send(
-            event=event,
-            message=f"❌ 未找到包含「{keyword}」的卡牌。",
-        )
+        await _send_text(bot, event, f"❌ 未找到包含「{keyword}」的卡牌。")
         return
 
     # 根据结果数量决定展示方式
     if len(results) == 1:
-        # 精确匹配单个结果
-        msg = format_single_card(results[0])
+        # 精确匹配单个结果：文本 + 卡图
+        await _send_card(bot, event, results[0], format_single_card(results[0]))
     else:
         # 多个结果，展示列表
         msg = format_search_results(results, keyword)
-
-    await bot.send(event=event, message=msg)
-    # TODO: 发送卡片图片
+        msg += "\n\n（回复 /sv !<ID> 查看单卡详情与卡图）"
+        await _send_text(bot, event, msg)

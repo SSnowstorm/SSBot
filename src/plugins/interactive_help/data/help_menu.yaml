@@ -1,6 +1,6 @@
 menu:
   title: "SSBot 帮助菜单"
-  subtitle: "点击下方分类查看功能"
+  subtitle: "回复分类名查看详细命令"
 
   categories:
     - id: comic
@@ -14,37 +14,89 @@ menu:
           action: "jm"
           permission: user
         - id: jm_search
-          label: "/jm搜索 搜索漫画"
+          label: "/jm_search 搜索并选择"
           type: command
-          action: "jm搜索"
+          action: "jm_search"
+          permission: user
+
+    - id: sv
+      label: "影之诗查卡"
+      style: success
+      permission: user
+      items:
+        - id: sv_search
+          label: "/sv <关键词> 模糊搜索"
+          type: command
+          action: "sv"
+          permission: user
+        - id: sv_class
+          label: "/sv #<职业> 按职业过滤"
+          type: command
+          action: "sv #精灵"
+          permission: user
+        - id: sv_id
+          label: "/sv !<ID> 查单卡（含卡图）"
+          type: command
+          action: "sv !10001110"
           permission: user
 
     - id: games
-      label: "娱乐游戏"
+      label: "娱乐"
       style: success
       permission: user
       items:
         - id: tic_tac_toe
-          label: "井字棋"
+          label: "/井字棋 人机对弈"
           type: command
           action: "井字棋"
           permission: user
+        - id: qinghua
+          label: "/情话 随机情话"
+          type: command
+          action: "情话"
+          permission: user
 
     - id: system
-      label: "系统管理"
+      label: "信息与系统"
+      style: warning
+      permission: user
+      items:
+        - id: group_list
+          label: "/get_list 查看群信息"
+          type: command
+          action: "get_list"
+          permission: user
+        - id: whoami
+          label: "/whoami 我是谁"
+          type: command
+          action: "whoami"
+          permission: user
+        - id: help_reload
+          label: "/help_reload 重载菜单（管理员）"
+          type: command
+          action: "help_reload"
+          permission: admin
+
+    - id: ai
+      label: "AI 管理"
       style: warning
       permission: admin
       items:
-        - id: status
-          label: "查看状态"
+        - id: choose_prompt
+          label: "/choose_prompt 切换人格"
           type: command
-          action: "status"
+          action: "choose_prompt"
           permission: admin
-        - id: restart
-          label: "重启 Bot"
+        - id: prompt
+          label: "/prompt 自定义提示词"
           type: command
-          action: "restart"
-          permission: super_admin
+          action: "prompt"
+          permission: admin
+        - id: insights
+          label: "/insights 查看 Token 用量"
+          type: command
+          action: "insights"
+          permission: admin
 
 permissions:
   admins: []
