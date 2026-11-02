@@ -152,7 +152,7 @@ src/plugins/ai_config_console/
 | PUT | `/prompts/{scene}/{name}` | 新建/覆盖人格 | `{content}` | `{ok}` |
 | DELETE | `/prompts/{scene}/{name}` | 删除人格 | - | `{ok}` |
 
-约束：name 仅允许 `[\w\u4e00-\u9fa5_-]{1,50}`；content 业务上限由环境变量 `AI_PROMPT_MAX_LENGTH` 控制（默认 2000，Pydantic 安全兜底 10000）；设计案 ≤200 字建议值由网页软提示（超 200 琥珀色，不阻止保存）。
+约束：name 仅允许 `[\w\u4e00-\u9fa5_-]{1,50}`；content 业务上限由环境变量 `AI_PROMPT_MAX_LENGTH` 控制（默认 2000，Pydantic 安全兜底 10000）；设计案 ≤200 字建议值由网页软提示（超 200 琥珀色，不阻止保存）。新建（文件不存在）允许空内容，覆盖已有文件时禁止空内容（D-01 修复）。
 
 ### 4.3 用量与备份
 
@@ -272,3 +272,4 @@ def require_token(x_ai_config_token: str = Header(default="")) -> None:
 | 2026-08-17 | v1.2：新增决策 5——admin 组纳入网页可编辑（admins/admin_group/allow_send_to_admin），SUPERUSERS 维持 .env 单一来源 | 王遵诗 / WorkBuddy |
 | 2026-08-17 | v1.3：P3 网页完成——第 6 章改为实现说明（5 视图 + 字段元数据 + 测试 17/17），第 7 章里程碑全部 ✅ | 王遵诗 / WorkBuddy |
 | 2026-08-18 | v1.4：网页样式重构（浅色简约主题）——拆出 style.css；header 加固 + 今日汇总卡（熔断占位 P5）+ 配置三区折叠（常用/进阶/管理权限）+ 省 Token 徽标（A1~A7）+ 开关加大 34×20 + 字段名配置键并排 + 图表网格今日高亮 + 骨架屏/保存 loading/脏数据提示 + 人格字数统计；后端新增 GET /backup/list、/status 返回 prompt_max_length、字数上限可配置（环境变量 AI_PROMPT_MAX_LENGTH，默认 2000） | 王遵诗 / WorkBuddy |
+| 2026-11-02 | v1.5：缺陷修复——D-01 新建空白人格、D-02 字数上限运行期生效、D-03 前端监听器一次性绑定、D-04 人格备份保留策略、D-09 钩子防绕过/防冒充、D-10 列表结构；详见 [缺陷修复记录](./缺陷修复记录.md) | 王遵诗 / WorkBuddy |
