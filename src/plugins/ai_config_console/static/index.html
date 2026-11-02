@@ -340,6 +340,14 @@ function renderConfig() {
   }).join('');
 
   // 脏数据监听 + 标签输入交互（事件委托）
+  // D-03 修复：监听器只绑定一次。原来每次 loadConfig() → renderConfig() 都会
+  // 重新 addEventListener，刷新 N 次就叠 N 套委托（标签输入被重复处理、脏标记重复触发）。
+  bindConfigEvents(wrap);
+}
+
+function bindConfigEvents(wrap) {
+  if (wrap.dataset.bound === '1') return;
+  wrap.dataset.bound = '1';
   wrap.addEventListener('input', e => {
     if (e.target.classList && e.target.classList.contains('tag-input')) return;
     markDirty();
@@ -582,7 +590,7 @@ async function createPrompt() {
     document.getElementById('promptEditor').value = '';
     updatePromptStats();
     loadPrompts();
-    showMsg('人格已创建，可编辑内容', 'ok');
+    showMsg('人格已创建（空模板），填写内容后点「保存人格」', 'ok');
   } catch (e) { showMsg('创建失败: ' + e.message, 'err'); }
 }
 

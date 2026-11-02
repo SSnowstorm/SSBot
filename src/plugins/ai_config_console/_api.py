@@ -70,11 +70,11 @@ async def list_prompts(scene: str) -> PromptListResp:
     """人格列表。"""
     if scene not in SCENES:
         raise HTTPException(status_code=400, detail="场景必须是 group/private")
-    items = [_prompt_store.list_prompts(scene)]
-    # list_prompts 返回 list[dict]，转换为模型
+    # D-10 修复：不再把列表多包一层（原来 [_prompt_store.list_prompts(scene)] 后取 [0]）
+    items = _prompt_store.list_prompts(scene)
     return PromptListResp(
         scene=scene,
-        prompts=[PromptListItem(**i) for i in items[0]],
+        prompts=[PromptListItem(**i) for i in items],
     )
 
 
@@ -94,7 +94,7 @@ async def get_prompt(scene: str, name: str) -> PromptGetResp:
 
 @router.put("/prompts/{scene}/{name}", response_model=OkResp, tags=["prompts"])
 async def save_prompt(scene: str, name: str, req: PromptPutReq) -> OkResp:
-    """新建/覆盖人格。"""
+    """新建/覆盖人格（新建允许空内容，覆盖已有内容时不允许清空）。"""
     if scene not in SCENES:
         raise HTTPException(status_code=400, detail="场景必须是 group/private")
     try:

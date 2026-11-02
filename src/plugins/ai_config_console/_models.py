@@ -27,7 +27,12 @@ def set_prompt_max(value: int) -> None:
 
 
 def get_prompt_max() -> int:
-    """读取当前人格字数上限。"""
+    """读取当前人格字数上限。
+
+    注意（D-02）：调用方必须"运行期调用"本函数，不要 `from ._models import
+    PROMPT_MAX_LENGTH` 按值导入——按值导入会在 import 时固化默认值，
+    导致 AI_PROMPT_MAX_LENGTH 配置不生效。
+    """
     return PROMPT_MAX_LENGTH
 
 
@@ -63,17 +68,22 @@ class PromptGetResp(BaseModel):
 
 
 class PromptPutReq(BaseModel):
-    """新建/覆盖人格请求体。"""
+    """新建/覆盖人格请求体。
 
-    content: str = Field(..., max_length=CONTENT_MAX)
+    语义约定（D-01 修复）：
+    - 新建（文件不存在）：允许 content 为空——网页"新建"按钮先建空文件再编辑；
+    - 覆盖（文件已存在）：content 不能为空，避免把已有的人格误清空。
+
+    因此这里只做长度上限与首尾空白规整，不做非空校验；空值是否合法
+    由 _prompt_store.save_prompt 按"目标文件是否存在"判定。
+    """
+
+    content: str = Field(default="", max_length=CONTENT_MAX)
 
     @field_validator("content")
     @classmethod
-    def content_not_empty(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("人格内容不能为空")
-        return v
+    def content_strip(cls, v: str) -> str:
+        return v.strip()
 
 
 class ConfigUpdateReq(BaseModel):

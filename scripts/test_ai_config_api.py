@@ -31,6 +31,28 @@ class _FakeDriver:
 
 nonebot.get_driver = lambda: _FakeDriver()
 
+# D-12 修复：本脚本早期只 mock 了 get_driver，没有 stub suggarchat。
+# 插件 __init__ 会 import _inject_guard → 真实 import suggarchat → 其 __init__ 调
+# require("nonebot_plugin_localstore") → 未初始化 NoneBot 时抛
+# "Cannot load plugin nonebot_plugin_localstore!"，导致脚本根本跑不起来。
+# 这里与 test_ai_config_web.py 采用同一套最小 stub。
+import types as _types
+
+for _name, _attrs in {
+    "nonebot_plugin_suggarchat": {},
+    "nonebot_plugin_suggarchat.on_event": {
+        "on_before_chat": lambda *a, **k: type(
+            "M", (), {"append_handler": lambda self, f: f, "priority": 1, "block": False}
+        )()
+    },
+    "nonebot_plugin_suggarchat.event": {"BeforeChatEvent": object},
+    "nonebot_plugin_suggarchat.matcher": {"Matcher": object},
+}.items():
+    _m = _types.ModuleType(_name)
+    for _k, _v in _attrs.items():
+        setattr(_m, _k, _v)
+    sys.modules[_name] = _m
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -118,9 +140,21 @@ def main():
         check("usage 200", r.status_code == 200)
         body = r.json()
         check("7 天数据", len(body["daily"]) == 7, f"got {len(body.get('daily', []))}")
-        # 至少一天有数据（8-15 有记录）
-        has_data = any(d["count"] > 0 for d in body["daily"])
-        check("存在有记录的日期", has_data, f"daily={body['daily']}")
+        check("每日字段完整",
+              all({"date", "count", "token_input", "token_output"} <= set(d) for d in body["daily"]))
+        # D-12 附带：原断言"至少一天有数据"依赖"最近 7 天有人聊过天"，
+        # bot 停用一段时间后必红。改成直接读库对比，数据为空时校验"全 0"即可。
+        import sqlite3
+        from datetime import date as _date, timedelta as _timedelta
+
+        from src.plugins.ai_config_console._usage import DB_PATH
+
+        start = (_date.today() - _timedelta(days=6)).isoformat()
+        with sqlite3.connect(f"file:{DB_PATH.as_posix()}?mode=ro", uri=True) as conn:
+            rows = dict(conn.execute("SELECT date, usage_count FROM suggarchat_global_insights").fetchall())
+        expect = {d["date"]: int(rows.get(d["date"], 0)) for d in body["daily"]}
+        got = {d["date"]: d["count"] for d in body["daily"]}
+        check("与库内数据一致（近期无记录时应全 0）", got == expect, f"api={got} db={expect}")
 
         # 6. 写配置（测试后恢复）
         print("\n== 6. PUT /config ==")
