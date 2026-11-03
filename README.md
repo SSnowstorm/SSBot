@@ -150,7 +150,8 @@ SSBot/
 - [SuggarChat 管理与省 Token 设计案](docs/sugarchat管理与省token设计案.md)（治理层 + 已知问题防护）
 - [SuggarChat 管理系统设计文档](docs/sugarchat管理系统设计文档.md)（实现层：API 契约）
 - [SuggarChat 网页配置项清单](docs/sugarchat网页配置项清单.md)（字段层：网页表单对照）
-- [缺陷修复记录](docs/缺陷修复记录.md)（D-01~D-12：现象 / 根因 / 修复 / 验证）
+- [缺陷修复记录](docs/缺陷修复记录.md)（D-01~D-14：现象 / 根因 / 修复 / 验证）
+- [AI 跑团主持人（CoC KP）设计分析](docs/CoC跑团KP设计分析.md)（设计阶段，未实现：架构 / 规则 / 剧本 / 回合 / 复盘）
 
 ## License
 
