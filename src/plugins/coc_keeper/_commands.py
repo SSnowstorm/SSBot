@@ -9,6 +9,7 @@ P1：开团 / 行动 / 场景 / 线索 / 结束 —— 接场景状态机与模�
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 from nonebot import get_driver, on_command
@@ -154,6 +155,38 @@ USAGE = (
 )
 
 
+# ---------------- 输出安全 ----------------
+
+# 群聊里绝不该出现本地路径：盘符、UNC、常见用户目录
+_PATH_STOP = r"[^\s，。；、！？：（）()\[\]<>]*"
+_PATH_PATTERNS = (
+    re.compile(r"(?<![A-Za-z])[A-Za-z]:[\\/]" + _PATH_STOP),
+    re.compile(r"\\\\" + _PATH_STOP),
+    re.compile(r"(?:file://)?(?:/home|/Users|/root|/workspace|/tmp|/mnt)/" + _PATH_STOP),
+)
+
+
+def sanitize_public(text: str) -> str:
+    """抹掉回复里的本地路径（防御性兜底：正常路径应只回文件名）。"""
+    if not text:
+        return text
+    cleaned = text
+    for pattern in _PATH_PATTERNS:
+        cleaned = pattern.sub("（本地文件）", cleaned)
+    return cleaned
+
+
+def format_replay_reply(head: str, path: Path, *, uploaded: bool = False) -> str:
+    """复盘回复只暴露文件名，不暴露目录。"""
+    action = "已上传" if uploaded else "已生成"
+    return f"{head}\n\n（完整战报{action}：{path.name}）"
+
+
+async def _finish(text: str) -> None:
+    """所有对外回复的唯一出口：统一脱敏后再发送。"""
+    await coc_cmd.finish(sanitize_public(text))
+
+
 # ---------------- 入口 ----------------
 
 @coc_cmd.handle()
@@ -196,7 +229,7 @@ async def handle_coc(bot: Bot, event: MessageEvent, args: Message = CommandArg()
         await _handle_stop(event)
         return
 
-    await coc_cmd.finish(USAGE)
+    await _finish(USAGE)
 
 
 # ---------------- P0 命令 ----------------
@@ -209,7 +242,7 @@ async def _handle_create(event: MessageEvent, name: str) -> None:
 
     problems = validate(inv)
     if problems:
-        await coc_cmd.finish("角色卡生成异常：" + "；".join(problems))
+        await _finish("角色卡生成异常：" + "；".join(problems))
 
     char_id = store.save_character(campaign_id, inv, type_="pc", owner_qq=int(event.user_id))
     session = store.find_running_session(campaign_id)
@@ -220,7 +253,7 @@ async def _handle_create(event: MessageEvent, name: str) -> None:
             payload={"character_id": char_id, "name": inv.name, "source": "random"},
         )
 
-    await coc_cmd.finish("已生成调查员（可继续 /coc 状态 查看）：\n" + format_sheet(inv))
+    await _finish("已生成调查员（可继续 /coc 状态 查看）：\n" + format_sheet(inv))
 
 
 async def _handle_check(event: MessageEvent, rest: str) -> None:
@@ -228,19 +261,19 @@ async def _handle_check(event: MessageEvent, rest: str) -> None:
     campaign_id = _ensure_campaign(event)
     found = store.find_character_by_owner(campaign_id, int(event.user_id))
     if found is None:
-        await coc_cmd.finish("还没有角色卡，先发 /coc 车卡 生成一张。")
+        await _finish("还没有角色卡，先发 /coc 车卡 生成一张。")
 
     _, inv = found
     parts = [p for p in rest.split() if p]
     if not parts:
-        await coc_cmd.finish("用法：/coc 检定 <技能> [困难/极难]，例如 /coc 检定 侦查")
+        await _finish("用法：/coc 检定 <技能> [困难/极难]，例如 /coc 检定 侦查")
     skill_name = parts[0]
     difficulty = Difficulty.REGULAR
     if len(parts) > 1:
         try:
             difficulty = Difficulty.parse(parts[1])
         except ValueError:
-            await coc_cmd.finish(f"不认识的难度：{parts[1]}（可用 困难 / 极难）")
+            await _finish(f"不认识的难度：{parts[1]}（可用 困难 / 极难）")
 
     result = resolve(skill_name, inv.skill_value(skill_name), difficulty)
     session = store.find_running_session(campaign_id)
@@ -251,7 +284,7 @@ async def _handle_check(event: MessageEvent, rest: str) -> None:
             bonus_penalty=result.bonus - result.penalty,
             d100_value=result.roll, outcome=result.outcome.value, detail=result.detail,
         )
-    await coc_cmd.finish(f"🎲 {result.summary()}")
+    await _finish(f"🎲 {result.summary()}")
 
 
 async def _handle_sheet(event: MessageEvent) -> None:
@@ -259,34 +292,34 @@ async def _handle_sheet(event: MessageEvent) -> None:
     campaign_id = _ensure_campaign(event)
     found = store.find_character_by_owner(campaign_id, int(event.user_id))
     if found is None:
-        await coc_cmd.finish("还没有角色卡，先发 /coc 车卡 生成一张。")
-    await coc_cmd.finish(format_sheet(found[1]))
+        await _finish("还没有角色卡，先发 /coc 车卡 生成一张。")
+    await _finish(format_sheet(found[1]))
 
 
 # ---------------- P1 命令 ----------------
 
 async def _handle_start(event: MessageEvent, name: str) -> None:
     if not _is_admin(event):
-        await coc_cmd.finish("开团需要群管理员或超级用户。")
+        await _finish("开团需要群管理员或超级用户。")
 
     store = get_store()
     campaign_id = _ensure_campaign(event)
     if store.find_running_session(campaign_id):
-        await coc_cmd.finish("这个群已经有一局在跑，先 /coc 结束 再开新的。")
+        await _finish("这个群已经有一局在跑，先 /coc 结束 再开新的。")
 
     try:
         module_id = ensure_module(name)
     except FileNotFoundError:
-        await coc_cmd.finish(f"没找到模组「{name or 'wugang'}」。可用：{'、'.join(list_builtin_modules())}")
+        await _finish(f"没找到模组「{name or 'wugang'}」。可用：{'、'.join(list_builtin_modules())}")
         return
     except ModuleError as exc:
-        await coc_cmd.finish(f"模组校验失败：{exc}")
+        await _finish(f"模组校验失败：{exc}")
         return
 
     result = await get_runtime().start(campaign_id, module_id)
     module_row = store.get_module(module_id) or {}
     title = module_row.get("title") or "未知模组"
-    await coc_cmd.finish(f"【开团】{title}\n\n{result.narrative}")
+    await _finish(f"【开团】{title}\n\n{result.narrative}")
 
 
 async def _handle_act(event: MessageEvent, text: str) -> None:
@@ -294,13 +327,13 @@ async def _handle_act(event: MessageEvent, text: str) -> None:
     campaign_id = _ensure_campaign(event)
     session = store.find_running_session(campaign_id)
     if not session:
-        await coc_cmd.finish("这个群还没有进行中的团，先让管理员 /coc 开团。")
+        await _finish("这个群还没有进行中的团，先让管理员 /coc 开团。")
     if not text:
-        await coc_cmd.finish("用法：/coc 行动 我想检查桌上那封信")
+        await _finish("用法：/coc 行动 我想检查桌上那封信")
 
     result = await get_runtime().act(int(session["id"]), int(event.user_id), text)
     prefix = f"🎲 {result.check.summary()}\n" if result.check is not None else ""
-    await coc_cmd.finish(prefix + result.narrative)
+    await _finish(prefix + result.narrative)
 
 
 async def _handle_scene(event: MessageEvent) -> None:
@@ -308,15 +341,15 @@ async def _handle_scene(event: MessageEvent) -> None:
     campaign_id = _ensure_campaign(event)
     session = store.find_running_session(campaign_id)
     if not session:
-        await coc_cmd.finish("这个群还没有进行中的团。")
+        await _finish("这个群还没有进行中的团。")
 
     view = get_runtime().scene_view(int(session["id"]))
     if not view:
-        await coc_cmd.finish("读取场景失败。")
+        await _finish("读取场景失败。")
     scene = view["scene"]
     clues = "、".join(c["name"] for c in view["clues"]) or "（还没有）"
     exits = "、".join(e["label"] for e in view["exits"]) or "（无）"
-    await coc_cmd.finish(
+    await _finish(
         f"【场景】{scene['title']}（第 {view['turn_no']} 回合｜张力 {view['tension']}）\n"
         f"{scene['player_text']}\n"
         f"已发现线索：{clues}\n"
@@ -329,13 +362,13 @@ async def _handle_clues(event: MessageEvent) -> None:
     campaign_id = _ensure_campaign(event)
     session = store.find_running_session(campaign_id)
     if not session:
-        await coc_cmd.finish("这个群还没有进行中的团。")
+        await _finish("这个群还没有进行中的团。")
 
     view = get_runtime().scene_view(int(session["id"]))
     clues = view.get("clues") or []
     if not clues:
-        await coc_cmd.finish("目前还没有发现任何线索。")
-    await coc_cmd.finish("已发现线索：\n" + "\n".join(f"· {c['name']}" for c in clues))
+        await _finish("目前还没有发现任何线索。")
+    await _finish("已发现线索：\n" + "\n".join(f"· {c['name']}" for c in clues))
 
 
 async def _handle_attack(event: MessageEvent, rest: str) -> None:
@@ -343,16 +376,16 @@ async def _handle_attack(event: MessageEvent, rest: str) -> None:
     campaign_id = _ensure_campaign(event)
     session = store.find_running_session(campaign_id)
     if not session:
-        await coc_cmd.finish("这个群还没有进行中的团。")
+        await _finish("这个群还没有进行中的团。")
 
     parts = [p for p in rest.split() if p]
     if not parts:
-        await coc_cmd.finish("用法：/coc 攻击 <目标> [武器]，例如 /coc 攻击 老陈 小刀")
+        await _finish("用法：/coc 攻击 <目标> [武器]，例如 /coc 攻击 老陈 小刀")
 
     target = parts[0]
     weapon = parts[1] if len(parts) > 1 else ""
     result = await get_runtime().attack(int(session["id"]), int(event.user_id), target, weapon)
-    await coc_cmd.finish(result.narrative)
+    await _finish(result.narrative)
 
 
 async def _handle_sanity(event: MessageEvent, rest: str) -> None:
@@ -360,12 +393,12 @@ async def _handle_sanity(event: MessageEvent, rest: str) -> None:
     campaign_id = _ensure_campaign(event)
     session = store.find_running_session(campaign_id)
     if not session:
-        await coc_cmd.finish("这个群还没有进行中的团。")
+        await _finish("这个群还没有进行中的团。")
     if not rest:
-        await coc_cmd.finish("用法：/coc 理智 1/1d6（成功损失/失败损失）")
+        await _finish("用法：/coc 理智 1/1d6（成功损失/失败损失）")
 
     result = await get_runtime().sanity(int(session["id"]), int(event.user_id), rest.strip())
-    await coc_cmd.finish(result.narrative)
+    await _finish(result.narrative)
 
 
 async def _handle_replay(bot: Bot, event: MessageEvent, arg: str) -> None:
@@ -373,7 +406,7 @@ async def _handle_replay(bot: Bot, event: MessageEvent, arg: str) -> None:
     campaign_id = _ensure_campaign(event)
     session = store.find_running_session(campaign_id) or store.latest_session(campaign_id)
     if not session:
-        await coc_cmd.finish("这个群还没有可复盘的局。")
+        await _finish("这个群还没有可复盘的局。")
 
     report = build_replay(store, int(session["id"]))
     path = save_replay(report, REPLAY_DIR)
@@ -383,22 +416,23 @@ async def _handle_replay(bot: Bot, event: MessageEvent, arg: str) -> None:
     if "文件" in arg and group_id:
         try:
             await bot.upload_group_file(group_id=group_id, file=str(path), name=path.name)
-            await coc_cmd.finish(f"{head}\n\n（完整战报已上传：{path.name}）")
+            await _finish(format_replay_reply(head, path, uploaded=True))
         except Exception as exc:
-            await coc_cmd.finish(f"{head}\n\n（上传失败：{exc}；文件在 {path}）")
+            logger.warning(f"[coc] 战报上传失败: {exc!r}")
+            await _finish(f"{head}\n\n（上传失败，完整战报已保存在服务器上）")
         return
-    await coc_cmd.finish(f"{head}\n\n（完整战报已保存：{path}）")
+    await _finish(format_replay_reply(head, path, uploaded=False))
 
 
 async def _handle_stop(event: MessageEvent) -> None:
     if not _is_admin(event):
-        await coc_cmd.finish("结束本局需要群管理员或超级用户。")
+        await _finish("结束本局需要群管理员或超级用户。")
 
     store = get_store()
     campaign_id = _ensure_campaign(event)
     session = store.find_running_session(campaign_id)
     if not session:
-        await coc_cmd.finish("当前没有进行中的团。")
+        await _finish("当前没有进行中的团。")
 
     session_id = int(session["id"])
     state = store.get_session_state(session_id)
@@ -406,7 +440,7 @@ async def _handle_stop(event: MessageEvent) -> None:
     store.update_session_state(session_id, state)
     store.end_session(session_id)
     store.append_event(session_id, "session_end", actor=str(event.user_id), payload={"ending": state["ended"]})
-    await coc_cmd.finish("本局已结束。可以用 /coc 线索 回顾已发现的线索。")
+    await _finish("本局已结束。可以用 /coc 线索 回顾已发现的线索。")
 
 
 __all__ = [

@@ -6,6 +6,7 @@
 """
 
 import os
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -91,6 +92,25 @@ def main() -> None:
     )
     row = store.conn.execute("SELECT skill, d100, target FROM roll ORDER BY id DESC LIMIT 1").fetchone()
     check("掷骰记录写入会话", row is not None and row["skill"] == "侦查", str(dict(row) if row else None))
+
+    print("\n== 路径脱敏（P0 回归） ==")
+    raw = r"（完整战报已保存：E:\wzs\github-repo\SSBot\data\coc_keeper\replays\session_1.md）"
+    cleaned = _commands.sanitize_public(raw)
+    check("回复不含盘符", not re.search(r"[A-Za-z]:[\\/]", cleaned), cleaned)
+    check("回复不含目录名", "wzs" not in cleaned and "github-repo" not in cleaned, cleaned)
+    check("替换为占位符", "（本地文件）" in cleaned, cleaned)
+    check("POSIX 路径被抹掉", "user" not in _commands.sanitize_public("见 /home/user/notes.md"))
+    check("UNC 路径被抹掉", "server" not in _commands.sanitize_public(r"\\server\share\x.md"))
+    check("普通文本不受影响", _commands.sanitize_public("侦查 37/65 成功") == "侦查 37/65 成功")
+    url = "见 https://example.com/a?b=1"
+    check("URL 不被误伤", _commands.sanitize_public(url) == url, _commands.sanitize_public(url))
+
+    reply = _commands.format_replay_reply("# 战报\n## 时间线", Path(r"E:\wzs\github-repo\SSBot\data\coc_keeper\replays\session_1.md"))
+    check("复盘回复只带文件名", "session_1.md" in reply, reply)
+    check("复盘回复不含盘符", not re.search(r"[A-Za-z]:[\\/]", reply), reply)
+    check("复盘回复不含反斜杠", "\\" not in reply, reply)
+    uploaded = _commands.format_replay_reply("head", Path("/var/data/replays/session_9.md"), uploaded=True)
+    check("上传回复只带文件名", "session_9.md" in uploaded and "/var" not in uploaded, uploaded)
 
     print(f"\n===== {PASS} 通过 / {FAIL} 失败 =====")
     print(f"（临时库：{store.path}）")
