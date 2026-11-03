@@ -12,6 +12,7 @@
 | JM 漫画下载 | JM 漫画搜索、选择、下载、PDF 生成 | `/jm`、`/jm_search` |
 | 交互式帮助菜单 | 分类展示全部命令；默认纯文本（第三方协议端不渲染 json 卡片） | `/help` |
 | 群信息与娱乐 | 当前群信息摘要、随机情话、井字棋人机对弈 | `/get_list`、`/whoami`、`/情话`、`/井字棋` |
+| 跑团（CoC） | AI 主持人 P0：随机车卡、技能检定、角色状态（独立 SQLite） | `/coc` |
 
 ## 技术栈
 
@@ -138,7 +139,8 @@ SSBot/
 │  ├─ jm_downloader/      # JM 漫画下载
 │  ├─ get_group_info/     # 群信息
 │  ├─ plugin_nonebot_rand_qinghua/  # 随机情话
-│  └─ tic_tac_toe/        # 井字棋（人机对弈）
+│  ├─ tic_tac_toe/        # 井字棋（人机对弈）
+│  └─ coc_keeper/         # 跑团（CoC 7e）P0：车卡/检定/状态
 ├─ scripts/               # 工具脚本（API / 网页 / 回归 / 冒烟测试）
 ├─ docs/                  # 使用与设计文档
 └─ data/                  # 运行时数据（SQLite 记忆库、配置备份）

@@ -885,7 +885,7 @@ event 表 → 按 seq 重放 → 归类为：
 
 ## 10. 分期落地路线
 
-### P0 地基（先让"算得对"）
+### P0 地基（先让"算得对"）✅ 已实现 2026-11-03
 
 - 独立 SQLite + 表结构 + 迁移脚本；
 - 规则引擎：`check()` / 奖励惩罚骰 / 大成功大失败 / 对抗 / 伤害 / SAN；
@@ -893,6 +893,15 @@ event 表 → 按 seq 重放 → 归类为：
 - 单元测试（骰点边界、派生值计算、SAN 阈值）。
 
 **验收**：给定角色卡与技能，`/coc 检定 侦查` 输出正确骰点与结论；边界值（01/100/96/技能<50）全部符合规则。
+
+**实现落点**：
+
+| 部分 | 位置 |
+|---|---|
+| 规则内核 | `src/plugins/coc_keeper/domain/`（dice / check / character / effects） |
+| 持久层 | `src/plugins/coc_keeper/store/`（schema.sql + db.py，独立库 `data/coc_keeper/coc.sqlite3`） |
+| 命令层 | `src/plugins/coc_keeper/_commands.py`（`/coc 车卡` / `/coc 检定` / `/coc 状态`） |
+| 测试 | `scripts/test_coc_rules.py`（50）、`test_coc_store.py`（30）、`test_coc_commands.py`（13） |
 
 ### P1 最小可玩闭环（先让"跑得动"）
 

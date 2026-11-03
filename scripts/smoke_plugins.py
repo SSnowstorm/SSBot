@@ -53,6 +53,7 @@ TARGETS = [
     ("load_plugin", "src.plugins.interactive_help"),
     ("load_plugin", "src.plugins.sv_card"),
     ("load_plugin", "src.plugins.tic_tac_toe"),
+    ("load_plugin", "src.plugins.coc_keeper"),
     ("load_plugin", "nonebot_plugin_suggarchat"),
     ("load_plugin", "src.plugins.ai_config_console"),
 ]
@@ -65,6 +66,7 @@ EXPECTED = {
     "get_group_info",
     "sv_card",
     "tic_tac_toe",
+    "coc_keeper",
     "nonebot_plugin_suggarchat",
     "ai_config_console",
 }

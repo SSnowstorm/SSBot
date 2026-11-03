@@ -56,6 +56,27 @@ menu:
           action: "情话"
           permission: user
 
+    - id: coc
+      label: "跑团（CoC）"
+      style: primary
+      permission: user
+      items:
+        - id: coc_create
+          label: "/coc 车卡 随机生成调查员"
+          type: command
+          action: "coc 车卡"
+          permission: user
+        - id: coc_check
+          label: "/coc 检定 <技能> 掷一次检定"
+          type: command
+          action: "coc 检定 侦查"
+          permission: user
+        - id: coc_state
+          label: "/coc 状态 查看角色卡"
+          type: command
+          action: "coc 状态"
+          permission: user
+
     - id: system
       label: "信息与系统"
       style: warning

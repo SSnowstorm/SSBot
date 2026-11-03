@@ -33,6 +33,7 @@ nonebot.load_plugins("src/plugins/get_group_info")
 nonebot.load_plugin("src.plugins.interactive_help")
 nonebot.load_plugin("src.plugins.sv_card")
 nonebot.load_plugin("src.plugins.tic_tac_toe")  # 井字棋（D-05 修复：此前漏加载）
+nonebot.load_plugin("src.plugins.coc_keeper")  # 跑团（CoC 7e）P0：车卡/检定/状态
 nonebot.load_plugin("nonebot_plugin_suggarchat")  # AI 聊天（SuggarChat）
 nonebot.load_plugin("src.plugins.ai_config_console")  # SuggarChat 管理系统（AI 配置台）
 # nonebot.load_plugins("src/plugins/plugin_nonebot_jmcomic")  # 配置路径未指定，暂不加载
