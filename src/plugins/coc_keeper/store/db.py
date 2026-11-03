@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
@@ -53,11 +54,22 @@ class CocStore:
 
     def _ensure_schema(self) -> None:
         self.conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+        self._migrate()
         row = self.conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
         if row is None:
             self.conn.execute(
                 "INSERT INTO meta(key, value) VALUES('schema_version', ?)", (SCHEMA_VERSION,)
             )
+        self.conn.commit()
+
+    def _migrate(self) -> None:
+        """轻量迁移：只做「缺列就加列」，够 P1 用，正式迁移等 P2。"""
+        columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(session)")}
+        if "state_json" not in columns:
+            self.conn.execute("ALTER TABLE session ADD COLUMN state_json TEXT")
+        columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(module)")}
+        if "start_scene" not in columns:
+            self.conn.execute("ALTER TABLE module ADD COLUMN start_scene TEXT")
         self.conn.commit()
 
     def close(self) -> None:
@@ -91,6 +103,13 @@ class CocStore:
     def get_campaign(self, campaign_id: int) -> dict | None:
         row = self.conn.execute("SELECT * FROM campaign WHERE id=?", (campaign_id,)).fetchone()
         return dict(row) if row else None
+
+    def set_campaign_module(self, campaign_id: int, module_id: int) -> None:
+        self.conn.execute(
+            "UPDATE campaign SET module_id=?, updated_at=? WHERE id=?",
+            (module_id, _now(), campaign_id),
+        )
+        self.conn.commit()
 
     def find_campaign_by_group(self, group_id: int) -> dict | None:
         """按群号找最近的团（一群同时只跑一个 running 团，Q2）。"""
@@ -264,6 +283,19 @@ class CocStore:
             self.conn.execute("UPDATE session SET turn_no=? WHERE id=?", (turn_no, session_id))
         self.conn.commit()
 
+    def end_session(self, session_id: int) -> None:
+        now = _now()
+        row = self.conn.execute("SELECT campaign_id FROM session WHERE id=?", (session_id,)).fetchone()
+        self.conn.execute(
+            "UPDATE session SET status='ended', ended_at=? WHERE id=?", (now, session_id)
+        )
+        if row is not None:
+            self.conn.execute(
+                "UPDATE campaign SET status='ended', updated_at=? WHERE id=?",
+                (now, int(row["campaign_id"])),
+            )
+        self.conn.commit()
+
     def create_turn(self, session_id: int, no: int, scene_id: str | None = None) -> int:
         cur = self.conn.execute(
             "INSERT INTO turn(session_id, no, scene_id, created_at) VALUES(?,?,?,?)",
@@ -271,6 +303,101 @@ class CocStore:
         )
         self.conn.commit()
         return int(cur.lastrowid)
+
+    # ---------- 运行时状态 ----------
+
+    def update_session_state(self, session_id: int, state: dict) -> None:
+        self.conn.execute(
+            "UPDATE session SET state_json=? WHERE id=?", (_dumps(state), session_id)
+        )
+        self.conn.commit()
+
+    def get_session_state(self, session_id: int) -> dict:
+        row = self.conn.execute("SELECT state_json FROM session WHERE id=?", (session_id,)).fetchone()
+        return (_loads(row["state_json"], {}) or {}) if row else {}
+
+    # ---------- 模组 ----------
+
+    def save_module(self, module) -> int:
+        """写入（或按标题+版本覆盖）一个模组，返回 module_id。"""
+        meta = module.meta or {}
+        row = self.conn.execute(
+            "SELECT id FROM module WHERE title=? AND version=?",
+            (meta.get("title"), meta.get("version")),
+        ).fetchone()
+        payload = (
+            meta.get("title"), meta.get("version"), meta.get("author"),
+            _dumps(meta), module.background, module.source_path,
+            _dumps([asdict(s) for s in module.scenes.values()]),
+            _dumps({k: asdict(v) for k, v in module.npcs.items()}),
+            _dumps({k: asdict(v) for k, v in module.clues.items()}),
+            _dumps([]), _dumps(module.endings), _dumps([]),
+            1 if module.validated else 0, _now(), module.first_scene,
+        )
+        if row is None:
+            cur = self.conn.execute(
+                "INSERT INTO module(title, version, author, meta_json, background, source_path,"
+                " scenes_json, npcs_json, clues_json, timeline_json, endings_json, handouts_json,"
+                " validated, created_at, start_scene)"
+                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                payload,
+            )
+            self.conn.commit()
+            return int(cur.lastrowid)
+        module_id = int(row["id"])
+        self.conn.execute(
+            "UPDATE module SET author=?, meta_json=?, background=?, source_path=?, scenes_json=?,"
+            " npcs_json=?, clues_json=?, endings_json=?, validated=?, start_scene=? WHERE id=?",
+            (
+                meta.get("author"), _dumps(meta), module.background, module.source_path,
+                _dumps([asdict(s) for s in module.scenes.values()]),
+                _dumps({k: asdict(v) for k, v in module.npcs.items()}),
+                _dumps({k: asdict(v) for k, v in module.clues.items()}),
+                _dumps(module.endings), 1 if module.validated else 0,
+                module.first_scene, module_id,
+            ),
+        )
+        self.conn.commit()
+        return module_id
+
+    def get_module(self, module_id: int) -> dict | None:
+        row = self.conn.execute("SELECT * FROM module WHERE id=?", (module_id,)).fetchone()
+        return dict(row) if row else None
+
+    def find_module_by_title(self, title: str) -> dict | None:
+        row = self.conn.execute(
+            "SELECT * FROM module WHERE title=? ORDER BY id DESC LIMIT 1", (title,)
+        ).fetchone()
+        return dict(row) if row else None
+
+    # ---------- 线索 ----------
+
+    def discover_clue(self, session_id: int, clue_id: str, *, by: str = "", scene_id: str = "") -> bool:
+        """记录线索发现；已发现过返回 False。"""
+        try:
+            self.conn.execute(
+                "INSERT INTO clue_state(session_id, clue_id, discovered_by, discovered_at, scene_id)"
+                " VALUES(?,?,?,?,?)",
+                (session_id, clue_id, by, _now(), scene_id),
+            )
+            self.conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+    def discovered_clues(self, session_id: int) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT clue_id, discovered_by, discovered_at, scene_id FROM clue_state"
+            " WHERE session_id=? ORDER BY discovered_at",
+            (session_id,),
+        )
+        return [dict(r) for r in rows]
+
+    def has_clue(self, session_id: int, clue_id: str) -> bool:
+        row = self.conn.execute(
+            "SELECT 1 FROM clue_state WHERE session_id=? AND clue_id=?", (session_id, clue_id)
+        ).fetchone()
+        return row is not None
 
     # ---------- 掷骰 / 事件 ----------
 

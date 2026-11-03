@@ -1,12 +1,15 @@
-"""``/coc`` 命令层（P0 最小可用）。
+"""``/coc`` 命令层（P1）。
 
-P0 只做三件事：车卡、检定、查状态。真正的跑团流程（场景 / 回合 / 线索）
-要到 P1，所以这里刻意保持薄：命令只做参数解析与渲染，规则全在 ``domain``。
+P0：车卡 / 检定 / 状态
+P1：开团 / 行动 / 场景 / 线索 / 结束 —— 接场景状态机与模板或 LLM 叙事。
+
+命令只做参数解析与渲染；规则、状态、叙事分别在 domain / runtime / narrator。
 """
 
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from nonebot import get_driver, on_command
 from nonebot.adapters.onebot.v11 import Message, MessageEvent
@@ -22,11 +25,16 @@ from .domain import (
     resolve,
     validate,
 )
+from .module import Module, ModuleError, load_module
+from .runtime import CocRuntime, build_narrator
 from .store.db import DEFAULT_DB_PATH, CocStore
+
+MODULE_DIR = Path(__file__).parent / "data" / "modules"
 
 coc_cmd = on_command("coc", aliases={"跑团", "COC"}, priority=10, block=True)
 
 _store: CocStore | None = None
+_runtime: CocRuntime | None = None
 
 
 def get_store() -> CocStore:
@@ -38,6 +46,15 @@ def get_store() -> CocStore:
         logger.info(f"[coc] 数据库就绪: {_store.path}")
     return _store
 
+
+def get_runtime() -> CocRuntime:
+    global _runtime
+    if _runtime is None:
+        _runtime = CocRuntime(get_store(), build_narrator())
+    return _runtime
+
+
+# ---------------- 作用域 / 权限 ----------------
 
 def _here(event: MessageEvent) -> int:
     """群聊用群号，私聊用负的用户号，保证一间一 campaign。"""
@@ -53,6 +70,52 @@ def _ensure_campaign(event: MessageEvent) -> int:
         return int(campaign["id"])
     return store.create_campaign(f"群 {scope} 的团", group_id=scope)
 
+
+def _is_admin(event: MessageEvent) -> bool:
+    try:
+        superusers = {str(u) for u in get_driver().config.superusers}
+    except Exception:
+        superusers = set()
+    if str(event.user_id) in superusers:
+        return True
+    sender = getattr(event, "sender", None)
+    return getattr(sender, "role", "") in ("owner", "admin")
+
+
+# ---------------- 模组 ----------------
+
+def list_builtin_modules() -> list[str]:
+    return sorted(path.stem for path in MODULE_DIR.glob("*.json"))
+
+
+def load_builtin_module(name: str) -> Module:
+    """按文件名或模组标题加载内置模组。"""
+    name = (name or "").strip() or "wugang"
+    path = MODULE_DIR / f"{name}.json"
+    if path.is_file():
+        return load_module(path)
+    for candidate in MODULE_DIR.glob("*.json"):
+        module = load_module(candidate)
+        if module.title == name:
+            return module
+    raise FileNotFoundError(f"未找到模组: {name}")
+
+
+def ensure_module(name: str) -> int:
+    """确保模组已入库，返回 module_id。"""
+    store = get_store()
+    name = (name or "").strip()
+    row = store.find_module_by_title(name) if name else None
+    if row:
+        return int(row["id"])
+    module = load_builtin_module(name)
+    existing = store.find_module_by_title(module.title)
+    if existing:
+        return int(existing["id"])
+    return store.save_module(module)
+
+
+# ---------------- 渲染 ----------------
 
 def format_sheet(inv: Investigator) -> str:
     skills = inv.effective_skills()
@@ -73,13 +136,20 @@ def format_sheet(inv: Investigator) -> str:
 
 
 USAGE = (
-    "【跑团 P0 命令】\n"
-    "/coc 车卡 [名字]        随机生成一张调查员卡\n"
-    "/coc 检定 <技能> [困难/极难]   掷一次技能检定\n"
-    "/coc 状态               查看自己的角色卡\n"
-    "\n提示：规则为 CoC 7e 基础规则，房规以开团公告为准。"
+    "【跑团命令】\n"
+    "  /coc 开团 [模组]      开局（管理员）\n"
+    "  /coc 车卡 [名字]      随机生成调查员\n"
+    "  /coc 行动 <做什么>    在当前场景行动\n"
+    "  /coc 场景             查看当前场景与出口\n"
+    "  /coc 线索             查看已发现线索\n"
+    "  /coc 检定 <技能> [困难/极难]\n"
+    "  /coc 状态             查看角色卡\n"
+    "  /coc 结束             结束本局（管理员）\n"
+    "\n规则：CoC 7e 基础规则，房规以开团公告为准。"
 )
 
+
+# ---------------- 入口 ----------------
 
 @coc_cmd.handle()
 async def handle_coc(event: MessageEvent, args: Message = CommandArg()):
@@ -96,9 +166,26 @@ async def handle_coc(event: MessageEvent, args: Message = CommandArg()):
     if sub in ("状态", "角色", "sheet", "卡"):
         await _handle_sheet(event)
         return
+    if sub in ("开团", "开始", "start"):
+        await _handle_start(event, rest.strip())
+        return
+    if sub in ("行动", "act", "做"):
+        await _handle_act(event, rest.strip())
+        return
+    if sub in ("场景", "scene", "看"):
+        await _handle_scene(event)
+        return
+    if sub in ("线索", "clue"):
+        await _handle_clues(event)
+        return
+    if sub in ("结束", "stop"):
+        await _handle_stop(event)
+        return
 
     await coc_cmd.finish(USAGE)
 
+
+# ---------------- P0 命令 ----------------
 
 async def _handle_create(event: MessageEvent, name: str) -> None:
     store = get_store()
@@ -119,9 +206,7 @@ async def _handle_create(event: MessageEvent, name: str) -> None:
             payload={"character_id": char_id, "name": inv.name, "source": "random"},
         )
 
-    await coc_cmd.finish(
-        "已生成调查员（可继续 /coc 状态 查看）：\n" + format_sheet(inv)
-    )
+    await coc_cmd.finish("已生成调查员（可继续 /coc 状态 查看）：\n" + format_sheet(inv))
 
 
 async def _handle_check(event: MessageEvent, rest: str) -> None:
@@ -143,24 +228,15 @@ async def _handle_check(event: MessageEvent, rest: str) -> None:
         except ValueError:
             await coc_cmd.finish(f"不认识的难度：{parts[1]}（可用 困难 / 极难）")
 
-    skill_value = inv.skill_value(skill_name)
-    result = resolve(skill_name, skill_value, difficulty)
-
+    result = resolve(skill_name, inv.skill_value(skill_name), difficulty)
     session = store.find_running_session(campaign_id)
     if session:
         store.append_roll(
-            int(session["id"]),
-            actor=str(event.user_id),
-            kind="check",
-            skill=skill_name,
-            target=result.target,
-            difficulty=result.difficulty.value,
+            int(session["id"]), actor=str(event.user_id), kind="check",
+            skill=skill_name, target=result.target, difficulty=result.difficulty.value,
             bonus_penalty=result.bonus - result.penalty,
-            d100_value=result.roll,
-            outcome=result.outcome.value,
-            detail=result.detail,
+            d100_value=result.roll, outcome=result.outcome.value, detail=result.detail,
         )
-
     await coc_cmd.finish(f"🎲 {result.summary()}")
 
 
@@ -170,8 +246,104 @@ async def _handle_sheet(event: MessageEvent) -> None:
     found = store.find_character_by_owner(campaign_id, int(event.user_id))
     if found is None:
         await coc_cmd.finish("还没有角色卡，先发 /coc 车卡 生成一张。")
-    _, inv = found
-    await coc_cmd.finish(format_sheet(inv))
+    await coc_cmd.finish(format_sheet(found[1]))
 
 
-__all__ = ["coc_cmd", "get_store", "format_sheet"]
+# ---------------- P1 命令 ----------------
+
+async def _handle_start(event: MessageEvent, name: str) -> None:
+    if not _is_admin(event):
+        await coc_cmd.finish("开团需要群管理员或超级用户。")
+
+    store = get_store()
+    campaign_id = _ensure_campaign(event)
+    if store.find_running_session(campaign_id):
+        await coc_cmd.finish("这个群已经有一局在跑，先 /coc 结束 再开新的。")
+
+    try:
+        module_id = ensure_module(name)
+    except FileNotFoundError:
+        await coc_cmd.finish(f"没找到模组「{name or 'wugang'}」。可用：{'、'.join(list_builtin_modules())}")
+        return
+    except ModuleError as exc:
+        await coc_cmd.finish(f"模组校验失败：{exc}")
+        return
+
+    result = await get_runtime().start(campaign_id, module_id)
+    module_row = store.get_module(module_id) or {}
+    title = module_row.get("title") or "未知模组"
+    await coc_cmd.finish(f"【开团】{title}\n\n{result.narrative}")
+
+
+async def _handle_act(event: MessageEvent, text: str) -> None:
+    store = get_store()
+    campaign_id = _ensure_campaign(event)
+    session = store.find_running_session(campaign_id)
+    if not session:
+        await coc_cmd.finish("这个群还没有进行中的团，先让管理员 /coc 开团。")
+    if not text:
+        await coc_cmd.finish("用法：/coc 行动 我想检查桌上那封信")
+
+    result = await get_runtime().act(int(session["id"]), int(event.user_id), text)
+    prefix = f"🎲 {result.check.summary()}\n" if result.check is not None else ""
+    await coc_cmd.finish(prefix + result.narrative)
+
+
+async def _handle_scene(event: MessageEvent) -> None:
+    store = get_store()
+    campaign_id = _ensure_campaign(event)
+    session = store.find_running_session(campaign_id)
+    if not session:
+        await coc_cmd.finish("这个群还没有进行中的团。")
+
+    view = get_runtime().scene_view(int(session["id"]))
+    if not view:
+        await coc_cmd.finish("读取场景失败。")
+    scene = view["scene"]
+    clues = "、".join(c["name"] for c in view["clues"]) or "（还没有）"
+    exits = "、".join(e["label"] for e in view["exits"]) or "（无）"
+    await coc_cmd.finish(
+        f"【场景】{scene['title']}（第 {view['turn_no']} 回合｜张力 {view['tension']}）\n"
+        f"{scene['player_text']}\n"
+        f"已发现线索：{clues}\n"
+        f"可去：{exits}"
+    )
+
+
+async def _handle_clues(event: MessageEvent) -> None:
+    store = get_store()
+    campaign_id = _ensure_campaign(event)
+    session = store.find_running_session(campaign_id)
+    if not session:
+        await coc_cmd.finish("这个群还没有进行中的团。")
+
+    view = get_runtime().scene_view(int(session["id"]))
+    clues = view.get("clues") or []
+    if not clues:
+        await coc_cmd.finish("目前还没有发现任何线索。")
+    await coc_cmd.finish("已发现线索：\n" + "\n".join(f"· {c['name']}" for c in clues))
+
+
+async def _handle_stop(event: MessageEvent) -> None:
+    if not _is_admin(event):
+        await coc_cmd.finish("结束本局需要群管理员或超级用户。")
+
+    store = get_store()
+    campaign_id = _ensure_campaign(event)
+    session = store.find_running_session(campaign_id)
+    if not session:
+        await coc_cmd.finish("当前没有进行中的团。")
+
+    session_id = int(session["id"])
+    state = store.get_session_state(session_id)
+    state["ended"] = state.get("ended") or "manual"
+    store.update_session_state(session_id, state)
+    store.end_session(session_id)
+    store.append_event(session_id, "session_end", actor=str(event.user_id), payload={"ending": state["ended"]})
+    await coc_cmd.finish("本局已结束。可以用 /coc 线索 回顾已发现的线索。")
+
+
+__all__ = [
+    "coc_cmd", "get_store", "get_runtime", "format_sheet",
+    "list_builtin_modules", "load_builtin_module", "ensure_module",
+]

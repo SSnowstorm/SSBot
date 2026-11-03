@@ -61,10 +61,30 @@ menu:
       style: primary
       permission: user
       items:
+        - id: coc_start
+          label: "/coc 开团 开局（管理员）"
+          type: command
+          action: "coc 开团"
+          permission: admin
         - id: coc_create
           label: "/coc 车卡 随机生成调查员"
           type: command
           action: "coc 车卡"
+          permission: user
+        - id: coc_act
+          label: "/coc 行动 <做什么>"
+          type: command
+          action: "coc 行动 我检查那封信"
+          permission: user
+        - id: coc_scene
+          label: "/coc 场景 当前场景与出口"
+          type: command
+          action: "coc 场景"
+          permission: user
+        - id: coc_clues
+          label: "/coc 线索 已发现线索"
+          type: command
+          action: "coc 线索"
           permission: user
         - id: coc_check
           label: "/coc 检定 <技能> 掷一次检定"
@@ -76,6 +96,11 @@ menu:
           type: command
           action: "coc 状态"
           permission: user
+        - id: coc_stop
+          label: "/coc 结束 结束本局（管理员）"
+          type: command
+          action: "coc 结束"
+          permission: admin
 
     - id: system
       label: "信息与系统"

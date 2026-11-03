@@ -903,7 +903,7 @@ event 表 → 按 seq 重放 → 归类为：
 | 命令层 | `src/plugins/coc_keeper/_commands.py`（`/coc 车卡` / `/coc 检定` / `/coc 状态`） |
 | 测试 | `scripts/test_coc_rules.py`（50）、`test_coc_store.py`（30）、`test_coc_commands.py`（13） |
 
-### P1 最小可玩闭环（先让"跑得动"）
+### P1 最小可玩闭环（先让"跑得动"）✅ 已实现 2026-11-03
 
 - 手写小模组 JSON（3 场景 / 5 线索 / 2 NPC / 1 结局）；
 - 场景状态机 + 线索发现 + 行动协议（收集-结算）+ 状态条；
@@ -911,6 +911,20 @@ event 表 → 按 seq 重放 → 归类为：
 - 群内跑通 20 分钟一局。
 
 **验收**：3 人小队在群里从开场走到一个结局，全程无状态错乱、无剧透、每回合 ≤2 条消息。
+
+**实现落点**：
+
+| 部分 | 位置 |
+|---|---|
+| 模组模型与校验 | `src/plugins/coc_keeper/module/model.py`（场景图/线索/NPC/结局；引用完整性校验） |
+| 内置示例模组 | `src/plugins/coc_keeper/data/modules/wugang.json`（3 场景 / 5 线索 / 2 NPC / 2 结局） |
+| 动作解析 | `runtime/actions.py`（闭集动作 + 和/跟…说话句式 + 无法识别则反问） |
+| 场景状态机 | `runtime/engine.py`（调查/交谈/移动/使用物品 → 检定 → 线索/场景/结局） |
+| 叙事适配 | `runtime/narrator.py`（`TemplateNarrator` 默认；`COC_LLM_ENABLED=true` 切 DeepSeek，失败回退） |
+| 命令 | `/coc 开团`、`/coc 行动`、`/coc 场景`、`/coc 线索`、`/coc 结束` |
+| 测试 | `scripts/test_coc_runtime.py`（36 项：模组校验/动作解析/条件出口/线索/结局/持久化） |
+
+**P1 已知简化**：多人"声明-收集-结算"目前按「谁发 /coc 行动 就结算谁」的串行模式，收集窗口与超时留给 P2；LLM 叙事默认关闭，避免测试与成本不稳定。
 
 ### P2 模组导入 + 复盘（让"能长期用"）
 

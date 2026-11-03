@@ -12,7 +12,7 @@
 | JM 漫画下载 | JM 漫画搜索、选择、下载、PDF 生成 | `/jm`、`/jm_search` |
 | 交互式帮助菜单 | 分类展示全部命令；默认纯文本（第三方协议端不渲染 json 卡片） | `/help` |
 | 群信息与娱乐 | 当前群信息摘要、随机情话、井字棋人机对弈 | `/get_list`、`/whoami`、`/情话`、`/井字棋` |
-| 跑团（CoC） | AI 主持人 P0：随机车卡、技能检定、角色状态（独立 SQLite） | `/coc` |
+| 跑团（CoC） | AI 主持人 P1：车卡、开团、行动结算、场景/线索、检定（独立 SQLite + 模板/LLM 叙事） | `/coc` |
 
 ## 技术栈
 
@@ -113,6 +113,22 @@ nb run
 
 > 单卡/ID 查询会附卡牌图片（shadowverse-portal 直链）；列表结果回复 `/sv !<ID>` 可看单卡大图。
 
+### 跑团（CoC 7e）
+
+| 命令 | 说明 |
+|---|---|
+| `/coc 开团 [模组]` | 开局（管理员）：加载内置模组并进入首个场景 |
+| `/coc 车卡 [名字]` | 随机生成调查员 |
+| `/coc 行动 <做什么>` | 在当前场景行动（调查/交谈/移动/使用物品），自动掷检定 |
+| `/coc 场景` | 当前场景、回合、张力与出口 |
+| `/coc 线索` | 已发现线索 |
+| `/coc 检定 <技能> [困难/极难]` | 单独掷一次技能检定 |
+| `/coc 状态` | 角色卡与派生值 |
+| `/coc 结束` | 结束本局（管理员） |
+
+> 叙事默认用确定性模板（离线可跑）；设 `COC_LLM_ENABLED=true` + `DEEPSEEK_API_KEY` 可切换 LLM 叙事，失败自动回退模板。
+> 内置示例模组：`src/plugins/coc_keeper/data/modules/wugang.json`（3 场景 / 5 线索 / 2 NPC / 2 结局）。
+
 ### 其他插件
 
 | 命令 | 说明 |
@@ -140,7 +156,7 @@ SSBot/
 │  ├─ get_group_info/     # 群信息
 │  ├─ plugin_nonebot_rand_qinghua/  # 随机情话
 │  ├─ tic_tac_toe/        # 井字棋（人机对弈）
-│  └─ coc_keeper/         # 跑团（CoC 7e）P0：车卡/检定/状态
+│  └─ coc_keeper/         # 跑团（CoC 7e）：domain/store/runtime/module
 ├─ scripts/               # 工具脚本（API / 网页 / 回归 / 冒烟测试）
 ├─ docs/                  # 使用与设计文档
 └─ data/                  # 运行时数据（SQLite 记忆库、配置备份）
