@@ -96,6 +96,16 @@ menu:
           type: command
           action: "coc 状态"
           permission: user
+        - id: coc_attack
+          label: "/coc 攻击 <目标> [武器]"
+          type: command
+          action: "coc 攻击 老陈 小刀"
+          permission: user
+        - id: coc_sanity
+          label: "/coc 理智 1/1d6 理智检定"
+          type: command
+          action: "coc 理智 1/1d6"
+          permission: user
         - id: coc_replay
           label: "/coc 复盘 生成本局战报"
           type: command

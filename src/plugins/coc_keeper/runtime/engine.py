@@ -13,7 +13,19 @@ from dataclasses import dataclass
 
 from nonebot.log import logger
 
-from ..domain import Difficulty, Investigator, resolve
+from ..domain import (
+    Difficulty,
+    Investigator,
+    Weapon,
+    damage_bonus,
+    resolve,
+    resolve_attack,
+    roll,
+    roll_indefinite_madness,
+    roll_temporary_madness,
+    sanity_check,
+    weapon_by_name,
+)
 from ..module.model import Clue, Module, Npc, Scene, module_from_row
 from .actions import Action, parse_action
 from .narrator import Narrator, TemplateNarrator
@@ -325,6 +337,141 @@ class CocRuntime:
             label = exit_.label or module.scene(exit_.to).title
             return f"这里能看的似乎都看过了，也许该{label}。"
         return ""
+
+    # ---------------- 战斗 / 理智 ----------------
+
+    def _npc_state(self, state: dict, npc) -> dict:
+        table = state.setdefault("npc_hp", {})
+        if npc.id not in table:
+            hp = int(npc.stats.get("HP", 10) or 10)
+            table[npc.id] = {"hp": hp, "max": hp, "dead": False}
+        return table[npc.id]
+
+    async def attack(self, session_id: int, qq: int, target: str, weapon_name: str = "") -> ActResult:
+        session = self.store.get_session(session_id)
+        if session is None:
+            return ActResult("这局不存在。", {}, "notice")
+        state = self.store.get_session_state(session_id)
+        if state.get("ended"):
+            return ActResult("这一局已经结束了。", state, "notice")
+
+        campaign_id = int(session["campaign_id"])
+        module = self._module(campaign_id)
+        scene = module.scene(state.get("scene") or module.first_scene)
+        found = self.store.find_character_by_owner(campaign_id, int(qq))
+        if found is None:
+            return ActResult("你还没有调查员，先发 /coc 车卡。", state, "notice")
+        char_id, inv = found
+
+        npc = self._match_npc(module, scene, target)
+        if npc is None:
+            return ActResult("这里没有你要攻击的对象。", state, "combat")
+
+        npc_state = self._npc_state(state, npc)
+        if npc_state["dead"]:
+            return ActResult(f"{npc.name}已经倒下了。", state, "combat")
+
+        weapon = weapon_by_name(weapon_name) if weapon_name else Weapon("徒手", "斗殴", "1d3")
+        db_text, _build = damage_bonus(inv.attrs)
+        db_value = roll(db_text, self.rng)[0] if "d" in db_text else int(db_text)
+
+        outcome = resolve_attack(
+            inv.skill_value(weapon.skill),
+            weapon=weapon,
+            defender_dodge=max(1, int(npc.stats.get("DEX", 50)) // 2),
+            hp=npc_state["hp"],
+            hp_max=npc_state["max"],
+            damage_bonus=max(0, db_value),
+            rng=self.rng,
+        )
+        npc_state["hp"] = max(0, outcome.hp_after)
+        if npc_state["hp"] == 0:
+            npc_state["dead"] = True
+
+        counter = None
+        if outcome.hit and not npc_state["dead"]:
+            npc_skill = int((npc.stats.get("skills") or {}).get("斗殴", 25))
+            counter = resolve_attack(
+                npc_skill,
+                hp=inv.hp,
+                hp_max=inv.hp_max,
+                defender_dodge=inv.skill_value("闪避"),
+                rng=self.rng,
+            )
+            inv.state["hp"] = max(-99, counter.hp_after)
+            self.store.update_character_state(char_id, inv.state)
+
+        lines = [f"你{weapon.name}攻击{npc.name}：{outcome.summary()}"]
+        if npc_state["dead"]:
+            lines.append(f"{npc.name}倒下了。")
+        elif counter is not None:
+            lines.append(f"{npc.name}反击：{counter.summary()}")
+        if inv.hp <= 0:
+            lines.append("你倒下了。")
+
+        self.store.append_roll(
+            session_id, actor=str(qq), kind="combat", skill=weapon.skill,
+            target=outcome.attack_check.target, difficulty="regular",
+            d100_value=outcome.attack_check.roll, outcome=outcome.attack_check.outcome.value,
+            detail={"npc": npc.id, "damage": outcome.damage, "npc_hp": npc_state["hp"]},
+        )
+        self.store.append_event(
+            session_id, "combat_round", actor=str(qq),
+            payload={
+                "npc": npc.id, "hit": outcome.hit, "damage": outcome.damage,
+                "npc_hp": npc_state["hp"], "player_hp": inv.hp,
+            },
+        )
+        turn_no = int(session.get("turn_no") or 0) + 1
+        self.store.update_session(session_id, turn_no=turn_no)
+        self.store.update_session_state(session_id, state)
+
+        narrative = await self.narrator.narrate({"kind": "combat", "text": "\n".join(lines)})
+        return ActResult(narrative, state, "combat")
+
+    async def sanity(self, session_id: int, qq: int, expression: str) -> ActResult:
+        session = self.store.get_session(session_id)
+        if session is None:
+            return ActResult("这局不存在。", {}, "notice")
+        state = self.store.get_session_state(session_id)
+        campaign_id = int(session["campaign_id"])
+        found = self.store.find_character_by_owner(campaign_id, int(qq))
+        if found is None:
+            return ActResult("你还没有调查员，先发 /coc 车卡。", state, "notice")
+        char_id, inv = found
+
+        total_before = int(state.get("san_loss_total", 0))
+        result = sanity_check(
+            inv.san, expression, self.rng, initial_san=inv.san_max, total_loss_before=total_before
+        )
+        inv.state["san"] = result.san_after
+        state["san_loss_total"] = total_before + result.loss
+        self.store.update_character_state(char_id, inv.state)
+
+        lines = [result.summary()]
+        if result.temp_insanity_check:
+            symptom = roll_temporary_madness(self.rng)
+            state["madness"] = symptom
+            lines.append(f"你陷入了「{symptom['name']}」：{symptom['desc']}")
+        if result.indefinite_insanity:
+            chronic = roll_indefinite_madness(self.rng)
+            state["madness_indefinite"] = chronic
+            lines.append(f"长期影响：「{chronic['name']}」——{chronic['desc']}")
+
+        self.store.append_roll(
+            session_id, actor=str(qq), kind="san", skill="SAN",
+            target=result.san_before, difficulty="regular",
+            d100_value=result.roll, outcome="regular" if result.success else "failure",
+            detail={"loss": result.loss, "san_after": result.san_after},
+        )
+        self.store.append_event(
+            session_id, "san_check", actor=str(qq),
+            payload={"expression": expression, "loss": result.loss, "san_after": result.san_after},
+        )
+        self.store.update_session_state(session_id, state)
+
+        narrative = await self.narrator.narrate({"kind": "sanity", "text": "\n".join(lines)})
+        return ActResult(narrative, state, "sanity", check=None)
 
     # ---------------- 视图与收尾 ----------------
 

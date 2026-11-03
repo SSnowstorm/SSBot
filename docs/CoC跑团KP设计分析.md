@@ -944,6 +944,8 @@ event 表 → 按 seq 重放 → 归类为：
 | 卡关兜底 | `runtime/engine.py` | 连续 3 轮无进展 → 软提示（1 次/场景）；6 轮 → `world_tick`（可见时间流逝，不占放水配额） |
 | 战斗 | `domain/combat.py` | 先攻（DEX）、攻击检定、闪避对抗（同级防守胜）、伤害/重伤/濒死 |
 | 疯狂表 | `domain/effects.py` | 临时性 / 不定性疯狂症状抽取（程序抽签，模型只演） |
+| 战斗接线 | `runtime/engine.py` + `/coc 攻击` | 命中/闪避对抗/伤害结算/NPC 反击/倒下判定，NPC HP 进会话状态 |
+| 理智接线 | `runtime/engine.py` + `/coc 理智` | SAN 检定 → 扣减 → 临时/不定性疯狂自动抽症状，累计损失记入会话 |
 
 **未实现（P2 剩余）**：模组导入流水线（PDF/DOCX → 分块 → LLM 填空 → 人工校对 → 发布）；导入前的结构校验已就绪（`module.validate_module`）。
 

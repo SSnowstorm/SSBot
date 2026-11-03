@@ -146,6 +146,8 @@ USAGE = (
     "  /coc 线索             查看已发现线索\n"
     "  /coc 检定 <技能> [困难/极难]\n"
     "  /coc 状态             查看角色卡\n"
+    "  /coc 攻击 <目标> [武器]  攻击场景里的 NPC\n"
+    "  /coc 理智 <损失>     理智检定，如 /coc 理智 1/1d6\n"
     "  /coc 复盘 [文件]      生成本局战报（加「文件」上传群文件）\n"
     "  /coc 结束             结束本局（管理员）\n"
     "\n规则：CoC 7e 基础规则，房规以开团公告为准。"
@@ -180,6 +182,12 @@ async def handle_coc(bot: Bot, event: MessageEvent, args: Message = CommandArg()
         return
     if sub in ("线索", "clue"):
         await _handle_clues(event)
+        return
+    if sub in ("攻击", "attack"):
+        await _handle_attack(event, rest.strip())
+        return
+    if sub in ("理智", "san", "sc"):
+        await _handle_sanity(event, rest.strip())
         return
     if sub in ("复盘", "replay", "战报"):
         await _handle_replay(bot, event, rest.strip())
@@ -328,6 +336,36 @@ async def _handle_clues(event: MessageEvent) -> None:
     if not clues:
         await coc_cmd.finish("目前还没有发现任何线索。")
     await coc_cmd.finish("已发现线索：\n" + "\n".join(f"· {c['name']}" for c in clues))
+
+
+async def _handle_attack(event: MessageEvent, rest: str) -> None:
+    store = get_store()
+    campaign_id = _ensure_campaign(event)
+    session = store.find_running_session(campaign_id)
+    if not session:
+        await coc_cmd.finish("这个群还没有进行中的团。")
+
+    parts = [p for p in rest.split() if p]
+    if not parts:
+        await coc_cmd.finish("用法：/coc 攻击 <目标> [武器]，例如 /coc 攻击 老陈 小刀")
+
+    target = parts[0]
+    weapon = parts[1] if len(parts) > 1 else ""
+    result = await get_runtime().attack(int(session["id"]), int(event.user_id), target, weapon)
+    await coc_cmd.finish(result.narrative)
+
+
+async def _handle_sanity(event: MessageEvent, rest: str) -> None:
+    store = get_store()
+    campaign_id = _ensure_campaign(event)
+    session = store.find_running_session(campaign_id)
+    if not session:
+        await coc_cmd.finish("这个群还没有进行中的团。")
+    if not rest:
+        await coc_cmd.finish("用法：/coc 理智 1/1d6（成功损失/失败损失）")
+
+    result = await get_runtime().sanity(int(session["id"]), int(event.user_id), rest.strip())
+    await coc_cmd.finish(result.narrative)
 
 
 async def _handle_replay(bot: Bot, event: MessageEvent, arg: str) -> None:

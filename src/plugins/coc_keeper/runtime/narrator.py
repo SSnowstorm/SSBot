@@ -49,6 +49,8 @@ class TemplateNarrator:
             return packet.get("text") or "故事在这里结束了。"
         if kind == "clarify":
             return packet.get("text") or "你是想做什么？可以说得具体一点。"
+        if kind in ("combat", "sanity"):
+            return packet.get("text") or "……"
         if kind == "wait":
             return packet.get("text") or "你们在原地等了一会儿，雾更浓了。"
         return packet.get("text") or "……"
@@ -82,6 +84,8 @@ class LlmNarrator:
             "clarify": "用一句话请玩家说清楚要做什么，不要猜。",
             "blocked": "用一句话说明这里过不去，不要透露隐藏条件。",
             "wait": "用一句话描写等待时环境的变化。",
+            "combat": "用 1-2 句描写这一轮交锋的结果，不要复述骰点。",
+            "sanity": "用 1-2 句描写理智受创的感受，不要解释规则。",
         }.get(kind, "用 1-2 句推进剧情。")
 
         messages = [
