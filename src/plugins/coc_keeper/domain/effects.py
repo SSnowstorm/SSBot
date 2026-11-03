@@ -144,3 +144,40 @@ def stabilization_target(con: int) -> int:
 def unconscious_check_target(con: int) -> int:
     """重伤后避免昏迷的 CON 检定目标值。"""
     return max(1, int(con))
+
+
+# ---------------- 疯狂表（简化版，供 KP 抽取） ----------------
+
+TEMPORARY_MADNESS = (
+    ("失忆", "对刚发生的几分钟完全失忆，事后无法复述。"),
+    ("假性残疾", "坚信自己某处受伤/失明，持续到症状消退。"),
+    ("暴力倾向", "对周围一切产生敌意，优先攻击最近的活物。"),
+    ("偏执", "认为所有人都在合谋害自己，拒绝合作。"),
+    ("重要之人", "把某个陌生人误认成重要的旧识，紧抓不放。"),
+    ("昏厥", "当场晕倒，短时间内无法行动。"),
+    ("恐慌逃离", "不顾一切地逃离现场，持续到远离恐惧源。"),
+    ("歇斯底里", "大哭或狂笑，无法进行需要专注的行动。"),
+    ("恐惧症", "对某个具体事物产生强烈恐惧（KP 指定）。"),
+    ("狂躁", "语速极快、动作夸张，难以被说服。"),
+)
+
+INDEFINITE_MADNESS = (
+    ("慢性恐惧症", "长期性的恐惧，遇到触发源时强制 SAN 检定。"),
+    ("解离性障碍", "在压力下会出现人格切换或时间空白。"),
+    ("强迫行为", "反复执行某个无意义动作，难以自控。"),
+    ("偏执妄想", "长期相信被监视/被追踪。"),
+    ("创伤后应激", "对类似场景产生强烈回避与闪回。"),
+)
+
+
+def roll_temporary_madness(rng: random.Random | None = None) -> dict:
+    """抽取一条临时性疯狂症状（KP 只负责演，抽签在程序里）。"""
+    rng = rng or random
+    name, desc = TEMPORARY_MADNESS[rng.randint(0, len(TEMPORARY_MADNESS) - 1)]
+    return {"kind": "temporary", "name": name, "desc": desc}
+
+
+def roll_indefinite_madness(rng: random.Random | None = None) -> dict:
+    rng = rng or random
+    name, desc = INDEFINITE_MADNESS[rng.randint(0, len(INDEFINITE_MADNESS) - 1)]
+    return {"kind": "indefinite", "name": name, "desc": desc}

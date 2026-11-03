@@ -96,6 +96,11 @@ menu:
           type: command
           action: "coc 状态"
           permission: user
+        - id: coc_replay
+          label: "/coc 复盘 生成本局战报"
+          type: command
+          action: "coc 复盘"
+          permission: user
         - id: coc_stop
           label: "/coc 结束 结束本局（管理员）"
           type: command

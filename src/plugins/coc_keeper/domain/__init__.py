@@ -16,6 +16,7 @@ from .character import (
     san_max,
     validate,
 )
+from .combat import WEAPONS, AttackOutcome, Weapon, initiative_order, resolve_attack, weapon_by_name
 from .check import (
     OUTCOME_LABEL,
     CheckResult,
@@ -28,12 +29,16 @@ from .check import (
 )
 from .dice import DiceError, d100, roll, roll_damage
 from .effects import (
+    INDEFINITE_MADNESS,
+    TEMPORARY_MADNESS,
     DamageResult,
     EffectError,
     SanResult,
     apply_damage,
     is_indefinite_insanity,
     parse_san_loss,
+    roll_indefinite_madness,
+    roll_temporary_madness,
     sanity_check,
     stabilization_target,
     unconscious_check_target,
@@ -44,8 +49,10 @@ __all__ = [
     "hp_max", "movement", "mp_max", "random_investigator", "san_max", "validate",
     "OUTCOME_LABEL", "CheckResult", "Difficulty", "Outcome", "is_fumble", "opposed",
     "resolve", "target_value",
+    "WEAPONS", "AttackOutcome", "Weapon", "initiative_order", "resolve_attack", "weapon_by_name",
     "DiceError", "d100", "roll", "roll_damage",
     "DamageResult", "EffectError", "SanResult", "apply_damage",
     "is_indefinite_insanity", "parse_san_loss", "sanity_check",
     "stabilization_target", "unconscious_check_target",
+    "TEMPORARY_MADNESS", "INDEFINITE_MADNESS", "roll_temporary_madness", "roll_indefinite_madness",
 ]

@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 
 from nonebot import get_driver, on_command
-from nonebot.adapters.onebot.v11 import Message, MessageEvent
+from nonebot.adapters.onebot.v11 import Bot, Message, MessageEvent
 from nonebot.log import logger
 from nonebot.params import CommandArg
 
@@ -26,10 +26,12 @@ from .domain import (
     validate,
 )
 from .module import Module, ModuleError, load_module
+from .replay import build_replay, save_replay
 from .runtime import CocRuntime, build_narrator
 from .store.db import DEFAULT_DB_PATH, CocStore
 
 MODULE_DIR = Path(__file__).parent / "data" / "modules"
+REPLAY_DIR = Path(DEFAULT_DB_PATH).parent / "replays"
 
 coc_cmd = on_command("coc", aliases={"跑团", "COC"}, priority=10, block=True)
 
@@ -144,6 +146,7 @@ USAGE = (
     "  /coc 线索             查看已发现线索\n"
     "  /coc 检定 <技能> [困难/极难]\n"
     "  /coc 状态             查看角色卡\n"
+    "  /coc 复盘 [文件]      生成本局战报（加「文件」上传群文件）\n"
     "  /coc 结束             结束本局（管理员）\n"
     "\n规则：CoC 7e 基础规则，房规以开团公告为准。"
 )
@@ -152,7 +155,7 @@ USAGE = (
 # ---------------- 入口 ----------------
 
 @coc_cmd.handle()
-async def handle_coc(event: MessageEvent, args: Message = CommandArg()):
+async def handle_coc(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
     text = args.extract_plain_text().strip()
     sub, _, rest = text.partition(" ")
     sub = sub.strip() or "帮助"
@@ -177,6 +180,9 @@ async def handle_coc(event: MessageEvent, args: Message = CommandArg()):
         return
     if sub in ("线索", "clue"):
         await _handle_clues(event)
+        return
+    if sub in ("复盘", "replay", "战报"):
+        await _handle_replay(bot, event, rest.strip())
         return
     if sub in ("结束", "stop"):
         await _handle_stop(event)
@@ -322,6 +328,28 @@ async def _handle_clues(event: MessageEvent) -> None:
     if not clues:
         await coc_cmd.finish("目前还没有发现任何线索。")
     await coc_cmd.finish("已发现线索：\n" + "\n".join(f"· {c['name']}" for c in clues))
+
+
+async def _handle_replay(bot: Bot, event: MessageEvent, arg: str) -> None:
+    store = get_store()
+    campaign_id = _ensure_campaign(event)
+    session = store.find_running_session(campaign_id) or store.latest_session(campaign_id)
+    if not session:
+        await coc_cmd.finish("这个群还没有可复盘的局。")
+
+    report = build_replay(store, int(session["id"]))
+    path = save_replay(report, REPLAY_DIR)
+    head = "\n".join(report.markdown.splitlines()[:10])
+
+    group_id = getattr(event, "group_id", None)
+    if "文件" in arg and group_id:
+        try:
+            await bot.upload_group_file(group_id=group_id, file=str(path), name=path.name)
+            await coc_cmd.finish(f"{head}\n\n（完整战报已上传：{path.name}）")
+        except Exception as exc:
+            await coc_cmd.finish(f"{head}\n\n（上传失败：{exc}；文件在 {path}）")
+        return
+    await coc_cmd.finish(f"{head}\n\n（完整战报已保存：{path}）")
 
 
 async def _handle_stop(event: MessageEvent) -> None:

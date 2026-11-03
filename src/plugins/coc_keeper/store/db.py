@@ -120,6 +120,12 @@ class CocStore:
         ).fetchone()
         return dict(row) if row else None
 
+    def latest_session(self, campaign_id: int) -> dict | None:
+        row = self.conn.execute(
+            "SELECT * FROM session WHERE campaign_id=? ORDER BY id DESC LIMIT 1", (campaign_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
     def find_running_session(self, campaign_id: int) -> dict | None:
         row = self.conn.execute(
             "SELECT * FROM session WHERE campaign_id=? AND status='running' ORDER BY id DESC LIMIT 1",
@@ -429,6 +435,12 @@ class CocStore:
         )
         self.conn.commit()
         return int(cur.lastrowid)
+
+    def list_rolls(self, session_id: int, limit: int = 500) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT * FROM roll WHERE session_id=? ORDER BY id LIMIT ?", (session_id, int(limit))
+        )
+        return [dict(r) for r in rows]
 
     def append_event(self, session_id: int, type_: str, *, actor: str | None = None, payload: dict | None = None) -> int:
         row = self.conn.execute(

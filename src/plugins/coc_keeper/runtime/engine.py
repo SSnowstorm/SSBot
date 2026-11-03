@@ -103,6 +103,7 @@ class CocRuntime:
         )
 
         result = await self._dispatch(session_id, module, scene, inv, action, state, qq)
+        result = await self._after_action(session_id, module, scene, result)
 
         # 回合推进 + 记录
         turn_no = int(session.get("turn_no") or 0) + 1
@@ -268,6 +269,62 @@ class CocRuntime:
                 "你试着这么做，但眼下的东西没什么反应。", state, "use_item", action
             )
         return ActResult("你摆开了架势，但这里暂时没有需要动手的对象。", state, action.type, action)
+
+    # ---------------- 卡关兜底 ----------------
+
+    async def _after_action(self, session_id: int, module: Module, scene: Scene, result: ActResult) -> ActResult:
+        """行动后检查是否卡关：先软提示（1 次/场景），再世界推进（1 次/场景）。
+
+        设计文档 6.8.1：世界推进不是放水，不占放水配额，但必须可见。
+        """
+        state = result.state
+        progressed = bool(result.clue) or result.kind in ("scene", "ending")
+        if progressed:
+            state["idle_turns"] = 0
+            return result
+
+        state["idle_turns"] = int(state.get("idle_turns", 0)) + 1
+        idle = int(state["idle_turns"])
+
+        if idle >= 3 and not state.get(f"hint_{scene.id}"):
+            hint = self._soft_hint(module, scene, session_id)
+            if hint:
+                state[f"hint_{scene.id}"] = True
+                state["tension"] = min(100, int(state.get("tension", 0)) + 5)
+                self.store.append_event(
+                    session_id, "keeper_mercy", actor="system",
+                    payload={"reason": "soft_hint", "scene": scene.id},
+                )
+                result.narrative = f"{result.narrative}\n\n（KP 提示）{hint}"
+                return result
+
+        if idle >= 6 and not state.get(f"tick_{scene.id}"):
+            state[f"tick_{scene.id}"] = True
+            state["tension"] = min(100, int(state.get("tension", 0)) + 10)
+            self.store.append_event(
+                session_id, "world_tick", actor="system",
+                payload={"scene": scene.id, "idle": idle},
+            )
+            result.narrative = (
+                f"{result.narrative}\n\n（时间在走）港口方向传来一声闷响，雾又浓了一分。"
+            )
+        return result
+
+    def _soft_hint(self, module: Module, scene: Scene, session_id: int) -> str:
+        undiscovered = [
+            clue for clue in module.scene_clues(scene.id)
+            if not self.store.has_clue(session_id, clue.id)
+        ]
+        main = [clue for clue in undiscovered if clue.importance == "main"] or undiscovered
+        if main:
+            clue = main[0]
+            return f"你总觉得「{clue.name}」还有没看清的地方，也许该再仔细检查一次。"
+        # 本场景已经没有可查的了：提示换场景，而不是让玩家干耗
+        if scene.exits:
+            exit_ = scene.exits[0]
+            label = exit_.label or module.scene(exit_.to).title
+            return f"这里能看的似乎都看过了，也许该{label}。"
+        return ""
 
     # ---------------- 视图与收尾 ----------------
 
