@@ -129,7 +129,7 @@ nb run
 | `/coc 复盘 [文件]` | 生成本局战报（Markdown，加「文件」上传群文件） |
 | `/coc 结束` | 结束本局（管理员） |
 
-> 设 `COC_LLM_ENABLED=true`（配合 `DEEPSEEK_API_KEY`）后：意图解析与 NPC 台词交给模型——玩家换说法也能听懂、NPC 按人设说话；任何失败自动回退规则与模板，断网也能跑。
+> 设 `COC_LLM_ENABLED=true`（配合 `DEEPSEEK_API_KEY`）后：叙事、意图解析与 NPC 台词交给模型——玩家换说法也能听懂、NPC 按人设说话、失败也有新方向；输出的剧透/骰点会被守卫拦下重写，任何失败自动回退规则与模板，断网也能跑。
 > 内置示例模组：`src/plugins/coc_keeper/data/modules/wugang.json`（3 场景 / 5 线索 / 2 NPC / 2 结局）。
 
 ### 其他插件

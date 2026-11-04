@@ -73,7 +73,11 @@ def get_runtime() -> CocRuntime:
             dialogue = TemplateDialogueWriter()
             logger.info("[coc] 意图/台词: 规则模式（COC_LLM_ENABLED 未开启）")
         _runtime = CocRuntime(
-            get_store(), build_narrator(), intent_parser=intent_parser, dialogue=dialogue
+            get_store(),
+            build_narrator(),
+            intent_parser=intent_parser,
+            dialogue=dialogue,
+            summarizer=client if enabled else None,
         )
     return _runtime
 

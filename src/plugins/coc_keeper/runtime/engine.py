@@ -30,6 +30,7 @@ from ..domain import (
 from ..module.model import Clue, Module, Npc, Scene, module_from_row
 from .actions import Action, parse_action
 from .llm import (MIN_CONFIDENCE, IntentResult, LlmClient, NpcLineRequest, RuleIntentParser, TemplateDialogueWriter)
+from .llm.memory import append_turn, maybe_summarize
 from .narrator import Narrator, TemplateNarrator
 
 
@@ -66,12 +67,14 @@ class CocRuntime:
         rng: random.Random | None = None,
         intent_parser=None,
         dialogue=None,
+        summarizer=None,
     ):
         self.store = store
         self.narrator = narrator or TemplateNarrator()
         self.rng = rng or random.Random()
         self.intent = intent_parser or RuleIntentParser()
         self.dialogue = dialogue or TemplateDialogueWriter()
+        self.summarizer = summarizer
 
     # ---------------- 模组 ----------------
 
@@ -107,7 +110,7 @@ class CocRuntime:
         self.store.update_session_state(session_id, state)
         self.store.append_event(session_id, "scene_enter", actor=actor, payload={"scene": scene.id})
 
-        narrative = await self._enter_scene(scene, module)
+        narrative = await self._enter_scene(session_id, module, scene, state)
         logger.info(f"[coc] 开局 campaign={campaign_id} session={session_id} scene={scene.id}")
         return ActResult(narrative=narrative, state=state, kind="scene")
 
@@ -134,7 +137,7 @@ class CocRuntime:
         intent = await self._parse_intent(text, state, scene, candidates)
         if intent.kind in ("unclear", "custom") or intent.confidence < MIN_CONFIDENCE:
             clarify = intent.clarify or self._clarify_text(module, scene)
-            narrative = await self.narrator.narrate({"kind": "clarify", "text": clarify})
+            narrative = await self._narrate(session_id, module, scene, "clarify", state=state, text=clarify)
             result = ActResult(narrative, state, "clarify")
             # 反问也算一次“卡住”：继续累计 idle，必要时给软提示
             result = await self._after_action(session_id, module, scene, result)
@@ -154,6 +157,8 @@ class CocRuntime:
 
         # 回合推进 + 记录
         turn_no = int(session.get("turn_no") or 0) + 1
+        append_turn(state, text, result.narrative)
+        await maybe_summarize(self.summarizer, state, turn_no)
         self.store.update_session(session_id, turn_no=turn_no)
         self.store.update_session_state(session_id, result.state)
         self.store.append_event(
@@ -166,8 +171,9 @@ class CocRuntime:
             result.state["ended"] = ending.get("id")
             self.store.update_session_state(session_id, result.state)
             self.store.append_event(session_id, "session_end", actor=str(qq), payload={"ending": ending.get("id")})
-            result.narrative = await self.narrator.narrate(
-                {"kind": "ending", "text": ending.get("text") or "", "ending_id": ending.get("id")}
+            result.narrative = await self._narrate(
+                session_id, module, scene, "ending", state=result.state,
+                text=ending.get("text") or "", ending_id=ending.get("id"),
             )
             result.ended = True
             result.kind = "ending"
@@ -175,6 +181,36 @@ class CocRuntime:
         return result
 
     # ---------------- 意图与场景 ----------------
+
+    async def _narrate(self, session_id, module, scene, kind, *, state=None, **fields) -> str:
+        """统一叙事入口：注入玩家可见上下文与 forbidden（守卫用，不发给模型）。"""
+        state = state if state is not None else self.store.get_session_state(session_id)
+        discovered = []
+        for row in self.store.discovered_clues(session_id):
+            clue = module.clue(row["clue_id"])
+            if clue is not None:
+                discovered.append(clue.name)
+
+        forbidden = []
+        for clue in module.clues.values():
+            if not self.store.has_clue(session_id, clue.id):
+                forbidden.append(clue.player_text)
+            if clue.keeper_text:
+                forbidden.append(clue.keeper_text)
+        for candidate_scene in module.scenes.values():
+            if candidate_scene.keeper_text:
+                forbidden.append(candidate_scene.keeper_text)
+
+        packet = {
+            "kind": kind,
+            "scene": {"id": scene.id, "title": scene.title, "player_text": scene.player_text},
+            "discovered": discovered,
+            "forbidden": forbidden,
+            "recent": (state.get("recent") or [])[-6:],
+            "summary": state.get("summary") or "",
+        }
+        packet.update(fields)
+        return await self.narrator.narrate(packet)
 
     def _build_candidates(self, module: Module, scene: Scene, session_id: int) -> list[dict]:
         """当前场景玩家能感知到的实体（给意图解析与反问用）。"""
@@ -234,9 +270,7 @@ class CocRuntime:
         index = remaining[0]
         seen.append(index)
         text = scene.details[index]
-        narrative = await self.narrator.narrate(
-            {"kind": "env", "text": text, "scene": {"id": scene.id, "title": scene.title}}
-        )
+        narrative = await self._narrate(session_id, module, scene, "env", state=state, text=text)
         return ActResult(narrative, state, "env", action)
 
     async def _dispatch(
@@ -263,8 +297,9 @@ class CocRuntime:
             return await self._simple(session_id, module, scene, inv, action, state, qq)
 
         return ActResult(
-            narrative=await self.narrator.narrate(
-                {"kind": "clarify", "text": "我没太听明白。你是想搜查、问人，还是去别的地方？"}
+            narrative=await self._narrate(
+                session_id, module, scene, "clarify", state=state,
+                text="我没太听明白。你是想搜查、问人，还是去别的地方？",
             ),
             state=state,
             kind="clarify",
@@ -284,7 +319,7 @@ class CocRuntime:
         condition = clue.discover_condition or {}
         skill_name = condition.get("skill")
         if not skill_name:
-            return await self._discover(session_id, clue, state, action, qq, check=None)
+            return await self._discover(session_id, module, scene, clue, state, action, qq, check=None)
 
         difficulty = Difficulty.parse(condition.get("difficulty", "regular"))
         check = resolve(skill_name, inv.skill_value(skill_name), difficulty, rng=self.rng)
@@ -295,22 +330,24 @@ class CocRuntime:
             d100_value=check.roll, outcome=check.outcome.value, detail=check.detail,
         )
         if check.success:
-            return await self._discover(session_id, clue, state, action, qq, check=check)
+            return await self._discover(session_id, module, scene, clue, state, action, qq, check=check)
 
-        narrative = await self.narrator.narrate(
-            {"kind": "check_fail", "check": {"skill": skill_name, "roll": check.roll, "target": check.target}}
+        narrative = await self._narrate(
+            session_id, module, scene, "check_fail", state=state,
+            check={"skill": skill_name, "roll": check.roll, "target": check.target},
         )
         return ActResult(narrative, state, "investigate", action, check=check)
 
-    async def _discover(self, session_id, clue: Clue, state, action, qq, *, check) -> ActResult:
+    async def _discover(self, session_id, module, scene, clue: Clue, state, action, qq, *, check) -> ActResult:
         self.store.discover_clue(session_id, clue.id, by=str(qq), scene_id=clue.scene)
         self.store.append_event(
             session_id, "clue_found", actor=str(qq), payload={"clue": clue.id, "scene": clue.scene}
         )
         # 线索可能提升张力（关键线索给压力）
         state["tension"] = min(100, int(state.get("tension", 0)) + (10 if clue.importance == "main" else 5))
-        narrative = await self.narrator.narrate(
-            {"kind": "clue", "clue": {"name": clue.name, "player_text": clue.player_text}}
+        narrative = await self._narrate(
+            session_id, module, scene, "clue", state=state,
+            clue={"name": clue.name, "player_text": clue.player_text},
         )
         return ActResult(narrative, state, "clue", action, check=check, clue=clue.id)
 
@@ -347,8 +384,9 @@ class CocRuntime:
                 session_id, "clue_found", actor=str(qq), payload={"clue": clue.id, "via": npc.id}
             )
 
-        narrative = await self.narrator.narrate(
-            {"kind": "npc", "npc": {"name": npc.name, "line": line}, "clue_text": reveal_text}
+        narrative = await self._narrate(
+            session_id, module, scene, "npc", state=state,
+            npc={"name": npc.name, "line": line}, clue_text=reveal_text,
         )
         return ActResult(narrative, state, "talk", action)
 
@@ -363,7 +401,10 @@ class CocRuntime:
             clue = module.clue(needed)
             hint = f"（也许该先查明「{clue.name}」）" if clue else ""
             return ActResult(
-                await self.narrator.narrate({"kind": "blocked", "text": f"这条路现在还走不通。{hint}"}),
+                await self._narrate(
+                    session_id, module, scene, "blocked", state=state,
+                    text=f"这条路现在还走不通。{hint}",
+                ),
                 state, "move", action,
             )
 
@@ -374,14 +415,17 @@ class CocRuntime:
         self.store.append_event(
             session_id, "scene_enter", actor=str(qq), payload={"scene": target_scene.id}
         )
-        narrative = await self._enter_scene(target_scene, module)
+        narrative = await self._enter_scene(session_id, module, target_scene, state)
         return ActResult(narrative, state, "scene", action)
 
     async def _simple(self, session_id, module, scene, inv, action, state, qq) -> ActResult:
         if action.type == "wait":
             state["tension"] = min(100, int(state.get("tension", 0)) + 5)
             return ActResult(
-                await self.narrator.narrate({"kind": "wait", "text": "你们在原地等了一会儿，雾更浓了。"}),
+                await self._narrate(
+                    session_id, module, scene, "wait", state=state,
+                    text="你们在原地等了一会儿，雾更浓了。",
+                ),
                 state, "wait", action,
             )
         if action.type == "skill_check":
@@ -592,7 +636,7 @@ class CocRuntime:
 
     # ---------------- 视图与收尾 ----------------
 
-    async def _enter_scene(self, scene: Scene, module: Module) -> str:
+    async def _enter_scene(self, session_id: int, module: Module, scene: Scene, state: dict) -> str:
         choices = []
         for clue in module.scene_clues(scene.id):
             choices.append(f"调查{clue.name}")
@@ -600,12 +644,8 @@ class CocRuntime:
             choices.append(f"和{npc.name}说话")
         for exit_ in scene.exits:
             choices.append(f"去{exit_.label or module.scene(exit_.to).title}")
-        return await self.narrator.narrate(
-            {
-                "kind": "scene",
-                "scene": {"id": scene.id, "title": scene.title, "player_text": scene.player_text},
-                "choices": choices[:6],
-            }
+        return await self._narrate(
+            session_id, module, scene, "scene", state=state, choices=choices[:6]
         )
 
     def scene_view(self, session_id: int) -> dict:

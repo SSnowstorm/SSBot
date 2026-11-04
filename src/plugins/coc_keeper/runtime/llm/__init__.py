@@ -5,10 +5,14 @@
 
 from .client import LlmClient
 from .intent import IntentParser, IntentResult, KINDS, MIN_CONFIDENCE, LlmIntentParser, RuleIntentParser
+from .guard import GuardResult, check as guard_check, leaks as guard_leaks
 from .keeper import DialogueWriter, LlmDialogueWriter, NpcLineRequest, TemplateDialogueWriter
+from .memory import append_turn, maybe_summarize, recent_context
 
 __all__ = [
     "LlmClient",
     "IntentParser", "IntentResult", "KINDS", "MIN_CONFIDENCE", "LlmIntentParser", "RuleIntentParser",
     "DialogueWriter", "LlmDialogueWriter", "NpcLineRequest", "TemplateDialogueWriter",
+    "GuardResult", "guard_check", "guard_leaks",
+    "append_turn", "maybe_summarize", "recent_context",
 ]

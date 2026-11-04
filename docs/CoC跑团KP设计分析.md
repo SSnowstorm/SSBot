@@ -949,7 +949,7 @@ event 表 → 按 seq 重放 → 归类为：
 
 **未实现（P2 剩余）**：模组导入流水线（PDF/DOCX → 分块 → LLM 填空 → 人工校对 → 发布）；导入前的结构校验已就绪（`module.validate_module`）。
 
-### P2.5 叙事层 A 阶段：意图 + 台词 ✅ 2026-11-04
+### P2.5 叙事层 A/B 阶段：意图 + 台词 + 叙事 ✅ 2026-11-04
 
 实测反馈（20:22 那局）暴露了两个核心体验问题：NPC 把 `voice` / `attitude` 当台词念，且玩家换个说法就"听不懂"。A 阶段先解决这两点：
 
@@ -961,10 +961,14 @@ event 表 → 按 seq 重放 → 归类为：
 | 场景细节 | `module/model.py` + `Scene.details` | 每场景 4 条氛围细节，`env` 动作按序揭示，解决"看看周围"没反应 |
 | 剧透守卫 | `runtime/engine.py` | 不允许透露时，台词与线索原文共享 6 字片段即回退 |
 | 配置 | `.env.example` | `COC_LLM_ENABLED` / `COC_LLM_MODEL` / `COC_LLM_TIMEOUT` |
+| 叙事 | `runtime/narrator.py` | `LlmNarrator`：场景/线索/失败/结局交给模型；`npc` / `combat` / `sanity` / `env` 透传，不二次生成 |
+| 守卫 | `runtime/llm/guard.py` | 剧透（6 字片段）、规则字样（骰点/检定/成功率）、长度；不过则重写一次，再不过回退模板 |
+| 连续性 | `runtime/llm/memory.py` | `recent` 最近 16 条（注入最近 6 条）+ 每 10 回合滚动摘要；失败保留旧摘要 |
+| 事实包 | `runtime/engine.py` | `_narrate()` 统一入口；`forbidden` 只给守卫，不发给模型 |
 
-**A 阶段验收**：`scripts/test_coc_intent.py` 26 项（候选集/意图映射/LLM 失败回退/细节不重复/台词不泄人设/剧透守卫/低置信反问）；全套 212 项断言通过。
+**A/B 阶段验收**：`scripts/test_coc_intent.py` 26 项 + `scripts/test_coc_narration.py` 20 项（守卫/重写/回退/连续性/事实包注入）；全套 232 项断言通过。
 
-**B 阶段待做**：叙事全面接 LLM（场景/失败/结局）、连续性摘要、输出剧透与数字守卫。
+**C 阶段待做**：风格档位影响措辞（宽松/标准/残酷）、mercy 文案、复盘记录 LLM 调用（模型/耗时/是否被守卫打回）。
 
 ### P3 体验打磨（让"跑得好"）
 
