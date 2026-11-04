@@ -140,3 +140,50 @@ def validate_creation(
         spent_interest=spent_interest,
         credit_rating=credit,
     )
+
+
+# ---------------- 自动分配 ----------------
+
+INFO_SKILLS = ("侦查", "聆听", "图书馆使用", "心理学")
+
+
+def auto_allocate_skills(attrs: dict, occupation: Occupation) -> dict:
+    """按职业推荐一套技能分配：信息类优先 65，核心 55，信用评级取下限+10。
+
+    只保证「合法 + 侦查类不拉胯」，剩余点数留给玩家自己加。
+    """
+    pool = skill_points(occupation.skill_formula, attrs)
+    skills: dict[str, int] = {}
+
+    low, high = occupation.credit_range
+    credit = min(high, low + 10)
+    credit = min(credit, max(low, pool // 3))
+    credit = max(low, min(credit, pool))
+    skills["信用评级"] = credit
+    spent = credit
+
+    info = [name for name in INFO_SKILLS if name in occupation.skills]
+    core = [name for name in occupation.skills if name not in info and name not in ("信用评级", "母语")]
+
+    for name in info + core:
+        base = base_skill_value(name, attrs)
+        target = 65 if name in info else 55
+        cost = min(max(0, target - base), max(0, pool - spent))
+        if cost > 0:
+            skills[name] = base + cost
+            spent += cost
+        if spent >= pool:
+            break
+
+    # 剩余点数补到信息类技能（上限 80）
+    for name in info:
+        if spent >= pool:
+            break
+        current = skills.get(name, base_skill_value(name, attrs))
+        add = min(80 - current, pool - spent)
+        if add > 0:
+            skills[name] = current + add
+            spent += add
+
+    skills["母语"] = int(attrs["EDU"])
+    return skills

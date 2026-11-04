@@ -67,7 +67,7 @@ menu:
           action: "coc 开团"
           permission: admin
         - id: coc_create
-          label: "/coc 车卡 随机生成调查员"
+          label: "/coc 车卡 车卡向导（点数/快速/随机）"
           type: command
           action: "coc 车卡"
           permission: user

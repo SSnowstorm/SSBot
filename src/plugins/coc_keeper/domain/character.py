@@ -97,6 +97,7 @@ class Investigator:
     public: dict = field(default_factory=dict)
     secret: dict = field(default_factory=dict)
     state: dict = field(default_factory=dict)
+    creation: dict = field(default_factory=dict)
 
     # ---- 派生值 ----
     @property
@@ -169,6 +170,7 @@ class Investigator:
                 "san_max": self.san_max,
                 "luck": self.luck,
             },
+            "creation": dict(self.creation),
         }
 
     @classmethod
@@ -181,6 +183,7 @@ class Investigator:
             public=dict(data.get("public") or {}),
             secret=dict(data.get("secret") or {}),
             state=dict(data.get("state") or {}),
+            creation=dict(data.get("creation") or {}),
         )
 
 

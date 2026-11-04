@@ -56,11 +56,22 @@ CREATE TABLE IF NOT EXISTS character (
     items_json     TEXT,
     public_json    TEXT,
     secret_json    TEXT,
+    creation_json  TEXT,                    -- 车卡来源（模式/职业/分配）
     created_at     TEXT,
     updated_at     TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_character_campaign ON character(campaign_id, type);
 CREATE INDEX IF NOT EXISTS idx_character_owner ON character(campaign_id, owner_qq);
+
+-- 车卡草稿（每个团 + QQ 一份，30 分钟过期）
+CREATE TABLE IF NOT EXISTS character_draft (
+    campaign_id  INTEGER REFERENCES campaign(id) ON DELETE CASCADE,
+    owner_qq     INTEGER NOT NULL,
+    step         TEXT NOT NULL,
+    payload_json TEXT,
+    updated_at   TEXT,
+    PRIMARY KEY (campaign_id, owner_qq)
+);
 
 -- 会话（一局）
 CREATE TABLE IF NOT EXISTS session (

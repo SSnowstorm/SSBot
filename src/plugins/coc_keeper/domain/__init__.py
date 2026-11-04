@@ -17,7 +17,7 @@ from .character import (
     validate,
 )
 from .combat import WEAPONS, AttackOutcome, Weapon, initiative_order, resolve_attack, weapon_by_name
-from .creation import CreationReport, validate_creation
+from .creation import CreationReport, auto_allocate_skills, validate_creation
 from .occupations import (
     CREATION_SKILL_CAP,
     OCCUPATIONS,
@@ -64,7 +64,7 @@ __all__ = [
     "OUTCOME_LABEL", "CheckResult", "Difficulty", "Outcome", "is_fumble", "opposed",
     "resolve", "target_value",
     "WEAPONS", "AttackOutcome", "Weapon", "initiative_order", "resolve_attack", "weapon_by_name",
-    "CreationReport", "validate_creation",
+    "CreationReport", "auto_allocate_skills", "validate_creation",
     "CREATION_SKILL_CAP", "OCCUPATIONS", "POINT_BUY_MAX", "POINT_BUY_MIN", "POINT_BUY_TOTAL",
     "Occupation", "base_skill_value", "get_occupation", "list_occupations", "skill_points",
     "validate_occupations",

@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from ..domain.character import Investigator
@@ -70,6 +70,9 @@ class CocStore:
         columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(module)")}
         if "start_scene" not in columns:
             self.conn.execute("ALTER TABLE module ADD COLUMN start_scene TEXT")
+        columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(character)")}
+        if "creation_json" not in columns:
+            self.conn.execute("ALTER TABLE character ADD COLUMN creation_json TEXT")
         self.conn.commit()
 
     def close(self) -> None:
@@ -143,14 +146,16 @@ class CocStore:
         type_: str = "pc",
         owner_qq: int | None = None,
         module_id: int | None = None,
+        creation: dict | None = None,
     ) -> int:
         """新建或更新角色（按 campaign + name + owner 判定是否已存在）。"""
         now = _now()
+        creation_data = creation if creation is not None else inv.creation
         payload = (
             campaign_id, module_id, type_, inv.name, owner_qq, inv.occupation,
             _dumps(inv.attrs), _dumps(inv.skills), _dumps(inv.state),
             _dumps([]), _dumps({}), _dumps(inv.public), _dumps(inv.secret),
-            now, now,
+            _dumps(creation_data), now, now,
         )
         existing = None
         if owner_qq is not None:
@@ -168,8 +173,8 @@ class CocStore:
             cur = self.conn.execute(
                 "INSERT INTO character(campaign_id, module_id, type, name, owner_qq, occupation,"
                 " attrs_json, skills_json, derived_json, condition_json, items_json,"
-                " public_json, secret_json, created_at, updated_at)"
-                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                " public_json, secret_json, creation_json, created_at, updated_at)"
+                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 payload,
             )
             self.conn.commit()
@@ -179,11 +184,12 @@ class CocStore:
         self.conn.execute(
             "UPDATE character SET module_id=?, type=?, name=?, owner_qq=?, occupation=?,"
             " attrs_json=?, skills_json=?, derived_json=?, condition_json=?, items_json=?,"
-            " public_json=?, secret_json=?, updated_at=? WHERE id=?",
+            " public_json=?, secret_json=?, creation_json=?, updated_at=? WHERE id=?",
             (
                 module_id, type_, inv.name, owner_qq, inv.occupation,
                 _dumps(inv.attrs), _dumps(inv.skills), _dumps(inv.state),
-                _dumps([]), _dumps({}), _dumps(inv.public), _dumps(inv.secret), now, char_id,
+                _dumps([]), _dumps({}), _dumps(inv.public), _dumps(inv.secret),
+                _dumps(creation_data), now, char_id,
             ),
         )
         self.conn.commit()
@@ -199,6 +205,7 @@ class CocStore:
             public=_loads(row["public_json"], {}) or {},
             secret=_loads(row["secret_json"], {}) or {},
             state=_loads(row["derived_json"], {}) or {},
+            creation=_loads(row["creation_json"], {}) or {},
         )
 
     def get_character(self, character_id: int) -> Investigator | None:
@@ -404,6 +411,46 @@ class CocStore:
             "SELECT 1 FROM clue_state WHERE session_id=? AND clue_id=?", (session_id, clue_id)
         ).fetchone()
         return row is not None
+
+    # ---------- 车卡草稿 ----------
+
+    def save_draft(self, campaign_id: int, owner_qq: int, step: str, payload: dict) -> None:
+        self.conn.execute(
+            "INSERT INTO character_draft(campaign_id, owner_qq, step, payload_json, updated_at)"
+            " VALUES(?,?,?,?,?)"
+            " ON CONFLICT(campaign_id, owner_qq) DO UPDATE SET"
+            " step=excluded.step, payload_json=excluded.payload_json, updated_at=excluded.updated_at",
+            (campaign_id, owner_qq, step, _dumps(payload), _now()),
+        )
+        self.conn.commit()
+
+    def get_draft(self, campaign_id: int, owner_qq: int, *, ttl_minutes: int = 30) -> dict | None:
+        row = self.conn.execute(
+            "SELECT * FROM character_draft WHERE campaign_id=? AND owner_qq=?",
+            (campaign_id, owner_qq),
+        ).fetchone()
+        if row is None:
+            return None
+        try:
+            updated = datetime.fromisoformat(row["updated_at"])
+        except (TypeError, ValueError):
+            self.delete_draft(campaign_id, owner_qq)
+            return None
+        if datetime.now() - updated > timedelta(minutes=ttl_minutes):
+            self.delete_draft(campaign_id, owner_qq)
+            return None
+        return {
+            "step": row["step"],
+            "payload": _loads(row["payload_json"], {}) or {},
+            "updated_at": row["updated_at"],
+        }
+
+    def delete_draft(self, campaign_id: int, owner_qq: int) -> None:
+        self.conn.execute(
+            "DELETE FROM character_draft WHERE campaign_id=? AND owner_qq=?",
+            (campaign_id, owner_qq),
+        )
+        self.conn.commit()
 
     # ---------- 掷骰 / 事件 ----------
 

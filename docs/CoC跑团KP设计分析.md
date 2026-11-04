@@ -978,7 +978,19 @@ pc` / `combat` / `sanity` / `env` 透传，不二次生成 |
 
 **A/B/C 阶段验收**：`test_coc_intent.py` 26 + `test_coc_narration.py` 20 + `test_coc_stage_c.py` 21（免命令分类/风格阈值/审计），全套 253 项断言通过。
 
-**下一阶段（P3）**：模组导入流水线（PDF/DOCX → 分块 → LLM 填空 → 人工校对）、车卡向导（点数分配/职业模板）、NPC 全自动扮演与多团管理。
+### P3 车卡向导 ✅ 2026-11-04
+
+| 部分 | 位置 | 说明 |
+|---|---|---|
+| 职业数据 | `domain/occupations.py` | 9 个职业：本职技能、技能点公式、信用评级范围、460 点属性模板 + 数据自检 |
+| 创建校验 | `domain/creation.py` | `validate_creation()`：点买 460/40-90、快速骰点 5 的倍数、本职/兴趣池、创建上限 90、信用评级、母语=EDU |
+| 自动分配 | `domain/creation.py` | `auto_allocate_skills()`：信息类优先 65、核心 55、信用评级下限+10，直接修掉“侦查 25” |
+| 向导状态机 | `runtime/wizard.py` | mode → occupation → attributes → skills → preview；支持「教育 -10」「侦查 80」「重置」「重掷」「取消」 |
+| 草稿 | `store/db.py` + `character_draft` 表 | 每（团, QQ）一份，30 分钟 TTL，可续跑 |
+| 命令 | `_commands.py` | `/coc 车卡` 进向导；`随机` 走老流程；普通消息在草稿期间自动路由给向导 |
+| 测试 | `scripts/test_coc_creation.py`（33）+ `test_coc_wizard.py`（29） | 全套 332 断言 |
+
+**剩余（P3）**：模组导入流水线、NPC 自动扮演、多团管理。
 
 ### P3 体验打磨（让"跑得好"）
 

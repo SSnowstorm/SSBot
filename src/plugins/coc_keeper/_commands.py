@@ -30,6 +30,7 @@ from .module import Module, ModuleError, load_module
 from .replay import build_replay, save_replay
 from .runtime import CocRuntime, build_narrator
 from .runtime.persona import load_persona
+from .runtime.wizard import CharacterWizard
 from .store.db import DEFAULT_DB_PATH, CocStore
 
 MODULE_DIR = Path(__file__).parent / "data" / "modules"
@@ -49,6 +50,16 @@ def get_store() -> CocStore:
         _store = CocStore(path)
         logger.info(f"[coc] 数据库就绪: {_store.path}")
     return _store
+
+
+_wizard: CharacterWizard | None = None
+
+
+def get_wizard() -> CharacterWizard:
+    global _wizard
+    if _wizard is None:
+        _wizard = CharacterWizard(get_store())
+    return _wizard
 
 
 def get_runtime() -> CocRuntime:
@@ -168,7 +179,7 @@ def format_sheet(inv: Investigator) -> str:
 USAGE = (
     "【跑团命令】\n"
     "  /coc 开团 [模组]      开局（管理员）\n"
-    "  /coc 车卡 [名字]      随机生成调查员\n"
+    "  /coc 车卡 [名字]      车卡向导（点数/快速/随机）\n"
     "  /coc 行动 <做什么>    在当前场景行动\n"
     "  /coc 场景             查看当前场景与出口\n"
     "  /coc 线索             查看已发现线索\n"
@@ -285,6 +296,27 @@ async def handle_ambient(event: MessageEvent):
     await ambient_msg.finish(sanitize_public(prefix + result.narrative))
 
 
+# ---------------- 车卡向导输入 ----------------
+
+wizard_msg = on_message(priority=40, block=True)
+
+
+@wizard_msg.handle()
+async def handle_wizard_input(event: MessageEvent):
+    """有车卡草稿时，玩家的普通消息就是向导输入。"""
+    if str(event.user_id) == str(event.self_id):
+        return
+    store = get_store()
+    campaign = store.find_campaign_by_group(_here(event))
+    if not campaign:
+        return
+    if store.get_draft(int(campaign["id"]), int(event.user_id)) is None:
+        return
+
+    reply = get_wizard().handle(int(campaign["id"]), int(event.user_id), event.get_plaintext())
+    await wizard_msg.finish(sanitize_public(reply.text))
+
+
 # ---------------- 入口 ----------------
 
 @coc_cmd.handle()
@@ -333,10 +365,20 @@ async def handle_coc(bot: Bot, event: MessageEvent, args: Message = CommandArg()
 # ---------------- P0 命令 ----------------
 
 async def _handle_create(event: MessageEvent, name: str) -> None:
+    if name in ("取消", "cancel"):
+        await _finish(get_wizard().cancel(_ensure_campaign(event), int(event.user_id)).text)
+        return
+
+    if name not in ("随机", "random"):
+        nickname = event.sender.nickname if getattr(event, "sender", None) else "调查员"
+        reply = get_wizard().start(_ensure_campaign(event), int(event.user_id), name=nickname)
+        await _finish(reply.text)
+        return
+
     store = get_store()
     campaign_id = _ensure_campaign(event)
     default_name = f"{event.sender.nickname if getattr(event, 'sender', None) else '调查员'}"
-    inv = random_investigator(name=name or f"{default_name}的调查员")
+    inv = random_investigator(name=f"{default_name}的调查员")
 
     problems = validate(inv)
     if problems:
