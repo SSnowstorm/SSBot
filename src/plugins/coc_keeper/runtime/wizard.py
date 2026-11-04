@@ -18,7 +18,9 @@ from ..domain import (
     POINT_BUY_TOTAL,
     auto_allocate_skills,
     base_skill_value,
+    damage_bonus,
     default_skills,
+    movement,
     get_occupation,
     hp_max,
     list_occupations,
@@ -52,16 +54,7 @@ class WizardReply:
 
 def sheet_text(inv: Investigator) -> str:
     attrs = inv.attrs
-    db_text, build = "0", 0
-    total = int(attrs.get("STR", 0)) + int(attrs.get("SIZ", 0))
-    if total >= 165:
-        db_text, build = "2d6", 4
-    elif total >= 125:
-        db_text, build = "1d6", 3
-    elif total >= 85:
-        db_text, build = "1d4", 2
-    elif total >= 65:
-        db_text, build = "-1", 1
+    db_text, build = damage_bonus(attrs)
     skills = inv.effective_skills()
     shown = "、".join(f"{name} {skills.get(name, 0)}" for name in ("侦查", "聆听", "图书馆使用", "医学", "急救", "心理学") if name in skills)
     return (
