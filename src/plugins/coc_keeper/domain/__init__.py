@@ -17,6 +17,20 @@ from .character import (
     validate,
 )
 from .combat import WEAPONS, AttackOutcome, Weapon, initiative_order, resolve_attack, weapon_by_name
+from .creation import CreationReport, validate_creation
+from .occupations import (
+    CREATION_SKILL_CAP,
+    OCCUPATIONS,
+    POINT_BUY_MAX,
+    POINT_BUY_MIN,
+    POINT_BUY_TOTAL,
+    Occupation,
+    base_skill_value,
+    get_occupation,
+    list_occupations,
+    skill_points,
+    validate_occupations,
+)
 from .check import (
     OUTCOME_LABEL,
     CheckResult,
@@ -50,6 +64,10 @@ __all__ = [
     "OUTCOME_LABEL", "CheckResult", "Difficulty", "Outcome", "is_fumble", "opposed",
     "resolve", "target_value",
     "WEAPONS", "AttackOutcome", "Weapon", "initiative_order", "resolve_attack", "weapon_by_name",
+    "CreationReport", "validate_creation",
+    "CREATION_SKILL_CAP", "OCCUPATIONS", "POINT_BUY_MAX", "POINT_BUY_MIN", "POINT_BUY_TOTAL",
+    "Occupation", "base_skill_value", "get_occupation", "list_occupations", "skill_points",
+    "validate_occupations",
     "DiceError", "d100", "roll", "roll_damage",
     "DamageResult", "EffectError", "SanResult", "apply_damage",
     "is_indefinite_insanity", "parse_san_loss", "sanity_check",
