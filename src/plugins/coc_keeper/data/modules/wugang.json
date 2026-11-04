@@ -6,7 +6,10 @@
     "start_scene": "harbor",
     "players": "1-4",
     "duration": "60-90 min",
-    "warnings": ["暴力", "精神污染"]
+    "warnings": [
+      "暴力",
+      "精神污染"
+    ]
   },
   "background": "KP 专属：港务局长与深潜者交易，用失踪船员换取渔获。灯塔的灯是封印，局长派人把它修坏。",
   "scenes": [
@@ -15,10 +18,27 @@
       "title": "雾港码头",
       "player_text": "凌晨的码头被雾吞掉一半，栈桥尽头有一盏忽明忽暗的灯。海腥味里混着煤油味。",
       "keeper_text": "灯下是船长的尸体，被海水泡了两天；局长刚离开不久。",
-      "clues": ["letter", "dock_tip"],
-      "npcs": ["dockhand"],
+      "clues": [
+        "letter",
+        "dock_tip"
+      ],
+      "npcs": [
+        "dockhand"
+      ],
       "exits": [
-        { "to": "warehouse", "label": "去废弃仓库", "condition": { "clue": "letter" } }
+        {
+          "to": "warehouse",
+          "label": "去废弃仓库",
+          "condition": {
+            "clue": "letter"
+          }
+        }
+      ],
+      "details": [
+        "栈桥的木板上有一道新的拖痕，通向仓库方向。",
+        "灯罩上糊着盐霜，光晕一圈圈发虚。",
+        "缆绳上挂着半截断掉的工牌。",
+        "空气里的煤油味比海腥味更冲。"
       ]
     },
     {
@@ -26,11 +46,29 @@
       "title": "废弃仓库",
       "player_text": "仓库门虚掩着，里面堆满受潮的木箱，墙上有新刷的石灰，盖住了什么。",
       "keeper_text": "石灰下是仪式用的符号；账本记录了渔获与失踪人数的对应关系。",
-      "clues": ["crate", "ledger"],
+      "clues": [
+        "crate",
+        "ledger"
+      ],
       "npcs": [],
       "exits": [
-        { "to": "harbor", "label": "回码头" },
-        { "to": "lighthouse", "label": "去灯塔", "condition": { "clue": "ledger" } }
+        {
+          "to": "harbor",
+          "label": "回码头"
+        },
+        {
+          "to": "lighthouse",
+          "label": "去灯塔",
+          "condition": {
+            "clue": "ledger"
+          }
+        }
+      ],
+      "details": [
+        "墙角的石灰是新刷的，摸上去还没干透。",
+        "地上有一圈干了的水渍，形状像被拖过的箱子。",
+        "横梁上挂着旧渔网，网眼里有细小的鳞片。",
+        "后门的门闩是从外面插上的。"
       ]
     },
     {
@@ -38,10 +76,23 @@
       "title": "灯塔",
       "player_text": "灯塔的门锁被撬开了。螺旋楼梯往上，灯室的玻璃映出一圈不自然的绿光。",
       "keeper_text": "灯室地面画着环状符号，油槽里混着血。局长想借仪式换取渔获。",
-      "clues": ["ritual"],
-      "npcs": ["lighthouse_keeper"],
+      "clues": [
+        "ritual"
+      ],
+      "npcs": [
+        "lighthouse_keeper"
+      ],
       "exits": [
-        { "to": "warehouse", "label": "回仓库" }
+        {
+          "to": "warehouse",
+          "label": "回仓库"
+        }
+      ],
+      "details": [
+        "楼梯的铁扶手上一层黏腻的锈水。",
+        "灯室的玻璃有几块是新换的，尺寸对不上。",
+        "油槽边沿有暗红色的指印。",
+        "窗外雾里有节奏地闪着两点绿光。"
       ]
     }
   ],
@@ -52,9 +103,20 @@
       "name": "湿透的信",
       "player_text": "信纸上是潦草的字：『别让灯灭。』落款被水泡烂了。",
       "keeper_text": "船长写给港务局长的信，两人早有勾结。",
-      "discover_condition": { "skill": "侦查", "difficulty": "regular" },
+      "discover_condition": {
+        "skill": "侦查",
+        "difficulty": "regular"
+      },
       "importance": "main",
-      "leads_to": ["warehouse"]
+      "leads_to": [
+        "warehouse"
+      ],
+      "aliases": [
+        "信",
+        "信纸",
+        "那封信",
+        "湿透的信"
+      ]
     },
     {
       "id": "dock_tip",
@@ -62,9 +124,17 @@
       "name": "老陈的目击",
       "player_text": "老陈压低声音：『昨儿后半夜，局长带人往仓库搬箱子，箱子底下滴水。』",
       "keeper_text": "老陈看到的是运往灯塔的仪式材料。",
-      "discover_condition": { "talk": "dockhand" },
+      "discover_condition": {
+        "talk": "dockhand"
+      },
       "importance": "side",
-      "leads_to": ["warehouse"]
+      "leads_to": [
+        "warehouse"
+      ],
+      "aliases": [
+        "目击",
+        "老陈的话"
+      ]
     },
     {
       "id": "crate",
@@ -72,9 +142,18 @@
       "name": "滴水的木箱",
       "player_text": "木箱缝隙里渗出海水，箱底的泥沙里混着几片鳞。",
       "keeper_text": "箱子里装的是深潜者带来的『渔获』。",
-      "discover_condition": { "skill": "侦查", "difficulty": "regular" },
+      "discover_condition": {
+        "skill": "侦查",
+        "difficulty": "regular"
+      },
       "importance": "main",
-      "leads_to": ["lighthouse"]
+      "leads_to": [
+        "lighthouse"
+      ],
+      "aliases": [
+        "木箱",
+        "箱子"
+      ]
     },
     {
       "id": "ledger",
@@ -82,9 +161,18 @@
       "name": "渔获账本",
       "player_text": "账本上每一笔『渔获』都对应一个失踪船员的名字，最后一页写着：灯塔检修，三日内完成。",
       "keeper_text": "局长用船员换渔获，灯塔检修是破坏封印的掩护。",
-      "discover_condition": { "skill": "图书馆使用", "difficulty": "regular" },
+      "discover_condition": {
+        "skill": "图书馆使用",
+        "difficulty": "regular"
+      },
       "importance": "main",
-      "leads_to": ["lighthouse"]
+      "leads_to": [
+        "lighthouse"
+      ],
+      "aliases": [
+        "账本",
+        "记录"
+      ]
     },
     {
       "id": "ritual",
@@ -92,9 +180,17 @@
       "name": "环状符号",
       "player_text": "灯室地面的符号还在渗血，油槽里的油泛着不正常的绿。",
       "keeper_text": "符号是封印的锚点，灯灭则封印失效。",
-      "discover_condition": { "skill": "神秘学", "difficulty": "regular" },
+      "discover_condition": {
+        "skill": "神秘学",
+        "difficulty": "regular"
+      },
       "importance": "main",
-      "leads_to": []
+      "leads_to": [],
+      "aliases": [
+        "符号",
+        "法阵",
+        "地上的符号"
+      ]
     }
   ],
   "npcs": [
@@ -106,9 +202,30 @@
         "attitude": "警惕但怕事",
         "voice": "短句，带方言，压低声音"
       },
-      "secret": { "knows": "局长半夜搬箱子，箱子滴水" },
+      "secret": {
+        "knows": "局长半夜搬箱子，箱子滴水"
+      },
       "gives_clue": "dock_tip",
-      "stats": { "STR": 60, "DEX": 45, "HP": 11, "skills": { "聆听": 35 } }
+      "stats": {
+        "STR": 60,
+        "DEX": 45,
+        "HP": 11,
+        "skills": {
+          "聆听": 35
+        }
+      },
+      "aliases": [
+        "老陈头",
+        "老陈"
+      ],
+      "lines": [
+        "……后半夜的事，我什么都没看见。",
+        "官老爷的事，少打听。"
+      ],
+      "answers": {
+        "局长": "局长？他半夜带人搬箱子，箱子底下一路滴水。",
+        "信": "信？码头上风大，纸片一会儿就吹没了。"
+      }
     },
     {
       "id": "lighthouse_keeper",
@@ -118,20 +235,44 @@
         "attitude": "麻木，像在等什么",
         "voice": "缓慢，答非所问"
       },
-      "secret": { "knows": "灯不能灭；局长的钱收了" },
+      "secret": {
+        "knows": "灯不能灭；局长的钱收了"
+      },
       "gives_clue": null,
-      "stats": { "STR": 45, "DEX": 40, "HP": 9 }
+      "stats": {
+        "STR": 45,
+        "DEX": 40,
+        "HP": 9
+      },
+      "aliases": [
+        "看守",
+        "老人"
+      ],
+      "lines": [
+        "灯不能灭。",
+        "你上来做什么？"
+      ],
+      "answers": {
+        "灯": "灯灭了，海里的东西就上来了。",
+        "局长": "他给钱，我修灯。别的不知道。"
+      }
     }
   ],
   "endings": [
     {
       "id": "burn",
-      "condition": { "clue": "ritual", "action": "use_item" },
+      "condition": {
+        "clue": "ritual",
+        "action": "use_item"
+      },
       "text": "你把煤油泼向符号，火沿着环线烧开。灯灭了，雾里的东西沉回海里——港口活了下来。"
     },
     {
       "id": "flee",
-      "condition": { "clue": "ritual", "action": "move" },
+      "condition": {
+        "clue": "ritual",
+        "action": "move"
+      },
       "text": "你转身离开灯塔。身后的绿光晃了晃，没有追来，但你知道这件事没结束。"
     }
   ]

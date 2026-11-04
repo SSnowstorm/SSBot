@@ -51,9 +51,30 @@ def get_store() -> CocStore:
 
 
 def get_runtime() -> CocRuntime:
+    """惰性单例：按环境变量决定「规则兜底」还是「模型理解 + 模型台词」。"""
     global _runtime
     if _runtime is None:
-        _runtime = CocRuntime(get_store(), build_narrator())
+        from .runtime.llm import (
+            LlmClient,
+            LlmDialogueWriter,
+            LlmIntentParser,
+            RuleIntentParser,
+            TemplateDialogueWriter,
+        )
+
+        enabled = os.getenv("COC_LLM_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+        client = LlmClient()
+        if enabled:
+            intent_parser = LlmIntentParser(client, RuleIntentParser())
+            dialogue = LlmDialogueWriter(client, TemplateDialogueWriter())
+            logger.info(f"[coc] 意图/台词: LLM({client.model}) 可用={client.available}")
+        else:
+            intent_parser = RuleIntentParser()
+            dialogue = TemplateDialogueWriter()
+            logger.info("[coc] 意图/台词: 规则模式（COC_LLM_ENABLED 未开启）")
+        _runtime = CocRuntime(
+            get_store(), build_narrator(), intent_parser=intent_parser, dialogue=dialogue
+        )
     return _runtime
 
 

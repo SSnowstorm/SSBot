@@ -31,6 +31,7 @@ class Scene:
     keeper_text: str = ""
     clues: list[str] = field(default_factory=list)
     npcs: list[str] = field(default_factory=list)
+    details: list[str] = field(default_factory=list)   # 氛围细节池（不含线索）
     exits: list[Exit] = field(default_factory=list)
 
 
@@ -40,6 +41,7 @@ class Clue:
     scene: str
     name: str
     player_text: str
+    aliases: list[str] = field(default_factory=list)   # 信/信纸/那封信
     keeper_text: str = ""
     discover_condition: dict = field(default_factory=dict)  # {"skill": "侦查"} / {"auto": true} / {"talk": "npc_x"}
     importance: str = "main"  # main / side / red_herring
@@ -53,6 +55,9 @@ class Npc:
     public: dict = field(default_factory=dict)   # identity / attitude / voice
     secret: dict = field(default_factory=dict)   # 永不进叙事提示词
     gives_clue: str | None = None
+    aliases: list[str] = field(default_factory=list)
+    lines: list[str] = field(default_factory=list)     # 模板台词（LLM 失败时用）
+    answers: dict = field(default_factory=dict)        # 关键词 -> 台词
     stats: dict = field(default_factory=dict)
 
 
@@ -178,6 +183,7 @@ def _build_scene(raw: dict) -> Scene:
         keeper_text=raw.get("keeper_text") or "",
         clues=list(raw.get("clues") or []),
         npcs=list(raw.get("npcs") or []),
+        details=list(raw.get("details") or []),
         exits=exits,
     )
 
@@ -193,6 +199,7 @@ def module_from_dict(data: dict, *, source_path: str = "") -> Module:
             id=raw["id"],
             scene=raw["scene"],
             name=raw.get("name") or raw["id"],
+            aliases=list(raw.get("aliases") or []),
             player_text=raw.get("player_text") or "",
             keeper_text=raw.get("keeper_text") or "",
             discover_condition=raw.get("discover_condition") or {},
@@ -208,6 +215,9 @@ def module_from_dict(data: dict, *, source_path: str = "") -> Module:
             public=raw.get("public") or {},
             secret=raw.get("secret") or {},
             gives_clue=raw.get("gives_clue"),
+            aliases=list(raw.get("aliases") or []),
+            lines=list(raw.get("lines") or []),
+            answers=dict(raw.get("answers") or {}),
             stats=raw.get("stats") or {},
         )
         for raw in (data.get("npcs") or [])

@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import random
+import re
 from dataclasses import dataclass
 
 from nonebot.log import logger
@@ -28,7 +29,20 @@ from ..domain import (
 )
 from ..module.model import Clue, Module, Npc, Scene, module_from_row
 from .actions import Action, parse_action
+from .llm import (MIN_CONFIDENCE, IntentResult, LlmClient, NpcLineRequest, RuleIntentParser, TemplateDialogueWriter)
 from .narrator import Narrator, TemplateNarrator
+
+
+def _text_leaks(text: str, secret: str, n: int = 6) -> bool:
+    """粗粒度剧透检测：共享任意 6 字片段即视为泄漏（fail-closed）。"""
+    if not text or not secret:
+        return False
+    clean_text = re.sub(r"\s+", "", text)
+    clean_secret = re.sub(r"\s+", "", secret)
+    if len(clean_secret) < n:
+        return clean_secret in clean_text
+    grams = {clean_secret[i:i + n] for i in range(len(clean_secret) - n + 1)}
+    return any(gram in clean_text for gram in grams)
 
 
 @dataclass
@@ -45,10 +59,19 @@ class ActResult:
 class CocRuntime:
     """一局游戏的运行时；一局一个实例即可（无跨局状态）。"""
 
-    def __init__(self, store, narrator: Narrator | None = None, rng: random.Random | None = None):
+    def __init__(
+        self,
+        store,
+        narrator: Narrator | None = None,
+        rng: random.Random | None = None,
+        intent_parser=None,
+        dialogue=None,
+    ):
         self.store = store
         self.narrator = narrator or TemplateNarrator()
         self.rng = rng or random.Random()
+        self.intent = intent_parser or RuleIntentParser()
+        self.dialogue = dialogue or TemplateDialogueWriter()
 
     # ---------------- 模组 ----------------
 
@@ -107,11 +130,23 @@ class CocRuntime:
             return ActResult("你还没有调查员，先发 /coc 车卡。", state, "notice")
         _, inv = found
 
-        action = parse_action(
-            text,
-            clues=[c.name for c in module.scene_clues(scene.id) if not self.store.has_clue(session_id, c.id)],
-            npcs=[n.name for n in module.scene_npcs(scene.id)],
-            exits=[e.label or module.scene(e.to).title for e in scene.exits],
+        candidates = self._build_candidates(module, scene, session_id)
+        intent = await self._parse_intent(text, state, scene, candidates)
+        if intent.kind in ("unclear", "custom") or intent.confidence < MIN_CONFIDENCE:
+            clarify = intent.clarify or self._clarify_text(module, scene)
+            narrative = await self.narrator.narrate({"kind": "clarify", "text": clarify})
+            result = ActResult(narrative, state, "clarify")
+            # 反问也算一次“卡住”：继续累计 idle，必要时给软提示
+            result = await self._after_action(session_id, module, scene, result)
+            self.store.update_session_state(session_id, state)
+            return result
+
+        action = Action(type=intent.kind, target=intent.target, raw=text.strip(), confident=True)
+        state["last_ic"] = text.strip()[:120]
+        self.store.append_event(
+            session_id, "intent", actor=str(qq),
+            payload={"kind": intent.kind, "target": intent.target, "source": intent.source,
+                     "confidence": intent.confidence, "approach": intent.approach},
         )
 
         result = await self._dispatch(session_id, module, scene, inv, action, state, qq)
@@ -139,6 +174,71 @@ class CocRuntime:
 
         return result
 
+    # ---------------- 意图与场景 ----------------
+
+    def _build_candidates(self, module: Module, scene: Scene, session_id: int) -> list[dict]:
+        """当前场景玩家能感知到的实体（给意图解析与反问用）。"""
+        items: list[dict] = []
+        for clue in module.scene_clues(scene.id):
+            items.append({
+                "id": clue.id, "type": "clue", "name": clue.name,
+                "aliases": list(clue.aliases or []),
+                "state": "discovered" if self.store.has_clue(session_id, clue.id) else "undiscovered",
+            })
+        for npc in module.scene_npcs(scene.id):
+            items.append({
+                "id": npc.id, "type": "npc", "name": npc.name,
+                "aliases": list(npc.aliases or []), "state": "present",
+            })
+        for exit_ in scene.exits:
+            label = exit_.label or module.scene(exit_.to).title
+            condition = exit_.condition or {}
+            locked = bool(condition.get("clue")) and not self.store.has_clue(session_id, condition["clue"])
+            items.append({
+                "id": f"exit_{exit_.to}", "type": "exit", "name": label,
+                "aliases": [], "state": "locked" if locked else "open",
+            })
+        return items
+
+    async def _parse_intent(self, text: str, state: dict, scene: Scene, candidates: list[dict]) -> IntentResult:
+        context = {
+            "text": text,
+            "scene": scene.title,
+            "last_line": state.get("last_ic") or "",
+            "candidates": candidates,
+        }
+        try:
+            return await self.intent.parse(text, context=context)
+        except Exception as exc:
+            logger.warning(f"[coc] 意图解析异常，按听不懂处理: {exc!r}")
+            return IntentResult(kind="unclear", confidence=0.0)
+
+    def _clarify_text(self, module: Module, scene: Scene) -> str:
+        options: list[str] = []
+        for clue in module.scene_clues(scene.id)[:2]:
+            options.append(f"再仔细看看「{clue.name}」")
+        for npc in module.scene_npcs(scene.id)[:1]:
+            options.append(f"问问{npc.name}")
+        for exit_ in scene.exits[:1]:
+            label = exit_.label or module.scene(exit_.to).title
+            options.append(label if label.startswith(("去", "回", "前往")) else f"去{label}")
+        if not options:
+            return "你想做什么？说得具体一点，我来推进。"
+        return "你想做什么？比如：" + "，或者".join(options) + "。"
+
+    async def _env(self, session_id, module, scene, action, state) -> ActResult:
+        seen = state.setdefault("details_seen", {}).setdefault(scene.id, [])
+        remaining = [i for i in range(len(scene.details)) if i not in seen]
+        if not remaining:
+            return ActResult("这里你已经看得很仔细了，没有更多可看的。", state, "env", action)
+        index = remaining[0]
+        seen.append(index)
+        text = scene.details[index]
+        narrative = await self.narrator.narrate(
+            {"kind": "env", "text": text, "scene": {"id": scene.id, "title": scene.title}}
+        )
+        return ActResult(narrative, state, "env", action)
+
     async def _dispatch(
         self,
         session_id: int,
@@ -155,6 +255,8 @@ class CocRuntime:
             return await self._investigate(session_id, module, scene, inv, action, state, qq)
         if kind == "talk":
             return await self._talk(session_id, module, scene, action, state, qq)
+        if kind == "env":
+            return await self._env(session_id, module, scene, action, state)
         if kind == "move":
             return await self._move(session_id, module, scene, action, state, qq)
         if kind in ("use_item", "attack", "dodge", "skill_check", "wait"):
@@ -217,21 +319,36 @@ class CocRuntime:
         if npc is None:
             return ActResult("这里没有可以搭话的人。", state, "talk", action)
 
-        line = str(npc.public.get("attitude") or "看了你一眼")
-        extra = ""
-        if npc.gives_clue and not self.store.has_clue(session_id, npc.gives_clue):
-            clue = module.clue(npc.gives_clue)
-            if clue is not None:
-                self.store.discover_clue(session_id, clue.id, by=str(qq), scene_id=clue.scene)
-                self.store.append_event(
-                    session_id, "clue_found", actor=str(qq), payload={"clue": clue.id, "via": npc.id}
-                )
-                extra = clue.player_text
-                line = f"【{npc.name}】{npc.public.get('voice') or ''}".strip()
+        clue = module.clue(npc.gives_clue) if npc.gives_clue else None
+        can_reveal = clue is not None and not self.store.has_clue(session_id, clue.id)
+        reveal_text = clue.player_text if (clue is not None and can_reveal) else ""
 
-        text = (line + ("\n" + extra if extra else "")).strip()
+        request = NpcLineRequest(
+            name=npc.name,
+            identity=str(npc.public.get("identity") or ""),
+            attitude=str(npc.public.get("attitude") or ""),
+            voice=str(npc.public.get("voice") or ""),
+            question=action.raw or action.target,
+            reveal_text=reveal_text,
+            answers=dict(npc.answers or {}),
+            lines=list(npc.lines or []),
+        )
+        line = (await self.dialogue.write(request, rng=self.rng)) or ""
+        if not line:
+            line = f"{npc.name}看了你一眼，没有接话。"
+
+        # 守卫：本轮不允许透露线索时，不得把线索原文漏出去
+        if clue is not None and not can_reveal and _text_leaks(line, clue.player_text):
+            line = f"{npc.name}看了你一眼，没有接话。"
+
+        if can_reveal and clue is not None:
+            self.store.discover_clue(session_id, clue.id, by=str(qq), scene_id=clue.scene)
+            self.store.append_event(
+                session_id, "clue_found", actor=str(qq), payload={"clue": clue.id, "via": npc.id}
+            )
+
         narrative = await self.narrator.narrate(
-            {"kind": "npc", "npc": {"name": npc.name, "line": text}, "clue_text": extra}
+            {"kind": "npc", "npc": {"name": npc.name, "line": line}, "clue_text": reveal_text}
         )
         return ActResult(narrative, state, "talk", action)
 

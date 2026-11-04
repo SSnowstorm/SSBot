@@ -51,6 +51,8 @@ class TemplateNarrator:
             return packet.get("text") or "你是想做什么？可以说得具体一点。"
         if kind in ("combat", "sanity"):
             return packet.get("text") or "……"
+        if kind == "env":
+            return packet.get("text") or "你看了看四周，没什么特别的。"
         if kind == "wait":
             return packet.get("text") or "你们在原地等了一会儿，雾更浓了。"
         return packet.get("text") or "……"

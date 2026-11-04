@@ -949,6 +949,23 @@ event 表 → 按 seq 重放 → 归类为：
 
 **未实现（P2 剩余）**：模组导入流水线（PDF/DOCX → 分块 → LLM 填空 → 人工校对 → 发布）；导入前的结构校验已就绪（`module.validate_module`）。
 
+### P2.5 叙事层 A 阶段：意图 + 台词 ✅ 2026-11-04
+
+实测反馈（20:22 那局）暴露了两个核心体验问题：NPC 把 `voice` / `attitude` 当台词念，且玩家换个说法就"听不懂"。A 阶段先解决这两点：
+
+| 部分 | 位置 | 说明 |
+|---|---|---|
+| 意图解析 | `runtime/llm/intent.py` | LLM 在「候选实体清单」里选，解决换说法；置信度 < 0.5 只反问一次并给具体选项；失败回退规则解析器 |
+| NPC 台词 | `runtime/llm/keeper.py` | 人设只作约束，`can_reveal` 由规则决定；LLM 失败回退模组预置 `lines` / `answers` |
+| 别名 | `module/model.py` + 示例模组 | `Clue.aliases`（信/信纸/那封信），确定性优先、模型兜底 |
+| 场景细节 | `module/model.py` + `Scene.details` | 每场景 4 条氛围细节，`env` 动作按序揭示，解决"看看周围"没反应 |
+| 剧透守卫 | `runtime/engine.py` | 不允许透露时，台词与线索原文共享 6 字片段即回退 |
+| 配置 | `.env.example` | `COC_LLM_ENABLED` / `COC_LLM_MODEL` / `COC_LLM_TIMEOUT` |
+
+**A 阶段验收**：`scripts/test_coc_intent.py` 26 项（候选集/意图映射/LLM 失败回退/细节不重复/台词不泄人设/剧透守卫/低置信反问）；全套 212 项断言通过。
+
+**B 阶段待做**：叙事全面接 LLM（场景/失败/结局）、连续性摘要、输出剧透与数字守卫。
+
 ### P3 体验打磨（让"跑得好"）
 
 - 车卡向导（私聊逐条问答 + 随机建议）；
