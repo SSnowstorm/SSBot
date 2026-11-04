@@ -949,7 +949,7 @@ event 表 → 按 seq 重放 → 归类为：
 
 **未实现（P2 剩余）**：模组导入流水线（PDF/DOCX → 分块 → LLM 填空 → 人工校对 → 发布）；导入前的结构校验已就绪（`module.validate_module`）。
 
-### P2.5 叙事层 A/B 阶段：意图 + 台词 + 叙事 ✅ 2026-11-04
+### P2.5 叙事层 A/B/C 阶段：意图 + 台词 + 叙事 + 交互 ✅ 2026-11-04
 
 实测反馈（20:22 那局）暴露了两个核心体验问题：NPC 把 `voice` / `attitude` 当台词念，且玩家换个说法就"听不懂"。A 阶段先解决这两点：
 
@@ -965,10 +965,13 @@ event 表 → 按 seq 重放 → 归类为：
 | 守卫 | `runtime/llm/guard.py` | 剧透（6 字片段）、规则字样（骰点/检定/成功率）、长度；不过则重写一次，再不过回退模板 |
 | 连续性 | `runtime/llm/memory.py` | `recent` 最近 16 条（注入最近 6 条）+ 每 10 回合滚动摘要；失败保留旧摘要 |
 | 事实包 | `runtime/engine.py` | `_narrate()` 统一入口；`forbidden` 只给守卫，不发给模型 |
+| 免命令模式 | `_commands.py` | 有 running 会话时普通消息即行动；`ooc:`/`//`/`（）` 走 OOC；只有本团玩家生效 |
+| 风格档位 | `runtime/style.py` | 宽松/标准/残酷：影响叙事指令、软提示/世界推进阈值、提示措辞 |
+| LLM 审计 | `runtime/engine.py` + `replay/builder.py` | 每次叙事调用记 `llm_call`（模型/耗时/是否重写/是否回退），战报统计一行 |
 
-**A/B 阶段验收**：`scripts/test_coc_intent.py` 26 项 + `scripts/test_coc_narration.py` 20 项（守卫/重写/回退/连续性/事实包注入）；全套 232 项断言通过。
+**A/B/C 阶段验收**：`test_coc_intent.py` 26 + `test_coc_narration.py` 20 + `test_coc_stage_c.py` 21（免命令分类/风格阈值/审计），全套 253 项断言通过。
 
-**C 阶段待做**：风格档位影响措辞（宽松/标准/残酷）、mercy 文案、复盘记录 LLM 调用（模型/耗时/是否被守卫打回）。
+**下一阶段（P3）**：模组导入流水线（PDF/DOCX → 分块 → LLM 填空 → 人工校对）、车卡向导（点数分配/职业模板）、NPC 全自动扮演与多团管理。
 
 ### P3 体验打磨（让"跑得好"）
 

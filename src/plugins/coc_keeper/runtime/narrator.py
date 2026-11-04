@@ -70,6 +70,7 @@ class LlmNarrator:
         self.fallback = fallback or TemplateNarrator()
         self.client = client or LlmClient()
         self.model = self.client.model
+        self.last_meta: dict = {}
 
     @property
     def available(self) -> bool:
@@ -99,6 +100,9 @@ class LlmNarrator:
             "只输出叙事正文，不要输出规则、骰点、内心独白或元叙述；不要替玩家做决定。"
             + self._instructions(kind)
         )
+        style = packet.get("style") or {}
+        if style.get("narration"):
+            system += f"风格要求：{style['narration']}"
         if strict:
             system += "重写要求：不要提到任何尚未发现的线索内容，不要写数字、骰点、检定或成功率。"
 
@@ -121,15 +125,23 @@ class LlmNarrator:
 
     async def narrate(self, packet: dict) -> str:
         kind = str(packet.get("kind") or "")
+        self.last_meta = {
+            "kind": kind, "model": self.model, "latency_ms": 0,
+            "retried": False, "fallback": False, "passthrough": kind in self._PASSTHROUGH,
+        }
         if kind in self._PASSTHROUGH or not self.available:
+            self.last_meta["fallback"] = not self.available
             return await self.fallback.narrate(packet)
 
         secrets = list(packet.get("forbidden") or [])
         text = await self._generate(packet, strict=False)
+        self.last_meta["latency_ms"] = getattr(self.client, "last_latency_ms", 0)
         if text and guard_check(text, secrets=secrets).ok:
             return text.strip()
 
         retry = await self._generate(packet, strict=True)
+        self.last_meta["retried"] = True
+        self.last_meta["latency_ms"] = getattr(self.client, "last_latency_ms", 0)
         if retry and guard_check(retry, secrets=secrets).ok:
             return retry.strip()
 
@@ -137,6 +149,7 @@ class LlmNarrator:
         if sample:
             reasons = guard_check(sample, secrets=secrets).reasons
             logger.info(f"[coc] 叙事未通过守卫（{reasons}），回退模板")
+        self.last_meta["fallback"] = True
         return await self.fallback.narrate(packet)
 
 

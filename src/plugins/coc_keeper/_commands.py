@@ -12,7 +12,7 @@ import os
 import re
 from pathlib import Path
 
-from nonebot import get_driver, on_command
+from nonebot import get_driver, on_command, on_message
 from nonebot.adapters.onebot.v11 import Bot, Message, MessageEvent
 from nonebot.log import logger
 from nonebot.params import CommandArg
@@ -176,6 +176,7 @@ USAGE = (
     "  /coc 理智 <损失>     理智检定，如 /coc 理智 1/1d6\n"
     "  /coc 复盘 [文件]      生成本局战报（加「文件」上传群文件）\n"
     "  /coc 结束             结束本局（管理员）\n"
+    "\n有进行中的团时，直接说话就是行动；想聊规则用 ooc: 或 // 开头。"
     "\n规则：CoC 7e 基础规则，房规以开团公告为准。"
 )
 
@@ -210,6 +211,76 @@ def format_replay_reply(head: str, path: Path, *, uploaded: bool = False) -> str
 async def _finish(text: str) -> None:
     """所有对外回复的唯一出口：统一脱敏后再发送。"""
     await coc_cmd.finish(sanitize_public(text))
+
+
+# ---------------- 免命令模式 ----------------
+
+_AMBIENT_OOC_PREFIXES = ("ooc:", "ooc：", "//", "【ooc】", "[ooc]", "（", "(",)
+_AMBIENT_ON = {"1", "true", "yes", "on"}
+
+
+def ambient_enabled() -> bool:
+    return os.getenv("COC_AMBIENT", "true").strip().lower() in _AMBIENT_ON
+
+
+def classify_ambient(text: str) -> tuple[str, str]:
+    """把群消息分成 command / ooc / action / ignore。
+
+    - 以 / 或 ！开头：命令，交给 /coc 处理
+    - ooc: / // / （）包裹：OOC
+    - 其余非空消息：当行动
+    """
+    raw = (text or "").strip()
+    if not raw:
+        return "ignore", ""
+    lowered = raw.lower()
+    # OOC 前缀优先：'//' 既是注释也是 OOC 标记，不能当命令
+    for prefix in _AMBIENT_OOC_PREFIXES:
+        if lowered.startswith(prefix.lower()):
+            body = raw[len(prefix):].strip(" ）)")
+            return "ooc", body or raw
+    if raw.startswith(("/", "／", "!")):
+        return "command", raw
+    if len(raw) <= 1:
+        return "ignore", raw
+    return "action", raw
+
+
+ambient_msg = on_message(priority=50, block=True)
+
+
+@ambient_msg.handle()
+async def handle_ambient(event: MessageEvent):
+    """有进行中的团时，玩家直接说话就是行动；OOC 前缀不进叙事。"""
+    if not ambient_enabled():
+        return
+    if str(event.user_id) == str(event.self_id):
+        return
+
+    kind, body = classify_ambient(event.get_plaintext())
+    if kind in ("ignore", "command"):
+        return
+
+    store = get_store()
+    campaign = store.find_campaign_by_group(_here(event))
+    if not campaign:
+        return
+    campaign_id = int(campaign["id"])
+    session = store.find_running_session(campaign_id)
+    if not session:
+        return
+    if store.find_character_by_owner(campaign_id, int(event.user_id)) is None:
+        return  # 只有本团玩家说话才算行动
+
+    session_id = int(session["id"])
+    if kind == "ooc":
+        store.append_event(session_id, "ooc", actor=str(event.user_id), payload={"text": body[:200]})
+        await ambient_msg.finish("（记下了，这条按 OOC 处理）")
+        return
+
+    result = await get_runtime().act(session_id, int(event.user_id), body)
+    prefix = f"🎲 {result.check.summary()}\n" if result.check is not None else ""
+    await ambient_msg.finish(sanitize_public(prefix + result.narrative))
 
 
 # ---------------- 入口 ----------------

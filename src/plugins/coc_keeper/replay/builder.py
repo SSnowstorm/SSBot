@@ -139,6 +139,10 @@ def build_replay(store, session_id: int) -> ReplayReport:
     if not clue_lines:
         clue_lines.append("- （本局没有发现线索）")
 
+    llm_events = [e for e in events if e.get("type") == "llm_call"]
+    llm_retried = sum(1 for e in llm_events if (e.get("payload") or {}).get("retried"))
+    llm_fallback = sum(1 for e in llm_events if (e.get("payload") or {}).get("fallback"))
+
     turns = int(session.get("turn_no") or 0)
     stats = {
         "turns": turns,
@@ -149,6 +153,9 @@ def build_replay(store, session_id: int) -> ReplayReport:
         "clues_total": total_clues,
         "clue_rate": round(len(clues) / total_clues * 100, 1) if total_clues else 0.0,
         "ending": (store.get_session_state(session_id) or {}).get("ended"),
+        "llm_calls": len(llm_events),
+        "llm_retried": llm_retried,
+        "llm_fallback": llm_fallback,
     }
 
     markdown = "\n".join(
@@ -158,6 +165,11 @@ def build_replay(store, session_id: int) -> ReplayReport:
             f"- 时间：{_format_time(session.get('started_at'))} → {_format_time(session.get('ended_at')) or '进行中'}",
             f"- 回合数：{turns}｜事件：{len(events)}｜掷骰：{len(rolls)}（成功率 {stats['success_rate']}%）",
             f"- 线索：{len(clues)}/{total_clues}（{stats['clue_rate']}%）｜结局：{stats['ending'] or '未结束'}",
+            (
+                f"- LLM 叙事调用：{stats['llm_calls']} 次"
+                f"（守卫重写 {stats['llm_retried']} / 回退模板 {stats['llm_fallback']}）"
+                if stats["llm_calls"] else ""
+            ),
             "",
             "## 时间线",
             "",

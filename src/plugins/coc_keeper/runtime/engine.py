@@ -32,6 +32,7 @@ from .actions import Action, parse_action
 from .llm import (MIN_CONFIDENCE, IntentResult, LlmClient, NpcLineRequest, RuleIntentParser, TemplateDialogueWriter)
 from .llm.memory import append_turn, maybe_summarize
 from .narrator import Narrator, TemplateNarrator
+from .style import StyleProfile, get_style
 
 
 def _text_leaks(text: str, secret: str, n: int = 6) -> bool:
@@ -182,6 +183,11 @@ class CocRuntime:
 
     # ---------------- 意图与场景 ----------------
 
+    def _style_for(self, session_id: int) -> StyleProfile:
+        session = self.store.get_session(session_id) or {}
+        campaign = self.store.get_campaign(int(session.get("campaign_id") or 0)) or {}
+        return get_style(campaign.get("keeper_style"))
+
     async def _narrate(self, session_id, module, scene, kind, *, state=None, **fields) -> str:
         """统一叙事入口：注入玩家可见上下文与 forbidden（守卫用，不发给模型）。"""
         state = state if state is not None else self.store.get_session_state(session_id)
@@ -209,8 +215,15 @@ class CocRuntime:
             "recent": (state.get("recent") or [])[-6:],
             "summary": state.get("summary") or "",
         }
+        style = self._style_for(session_id)
+        packet["style"] = {"key": style.key, "label": style.label, "narration": style.narration}
         packet.update(fields)
-        return await self.narrator.narrate(packet)
+
+        text = await self.narrator.narrate(packet)
+        meta = getattr(self.narrator, "last_meta", None)
+        if meta and not meta.get("passthrough"):
+            self.store.append_event(session_id, "llm_call", actor="system", payload=meta)
+        return text
 
     def _build_candidates(self, module: Module, scene: Scene, session_id: int) -> list[dict]:
         """当前场景玩家能感知到的实体（给意图解析与反问用）。"""
@@ -458,8 +471,9 @@ class CocRuntime:
 
         state["idle_turns"] = int(state.get("idle_turns", 0)) + 1
         idle = int(state["idle_turns"])
+        style = self._style_for(session_id)
 
-        if idle >= 3 and not state.get(f"hint_{scene.id}"):
+        if idle >= style.hint_at and not state.get(f"hint_{scene.id}"):
             hint = self._soft_hint(module, scene, session_id)
             if hint:
                 state[f"hint_{scene.id}"] = True
@@ -468,10 +482,10 @@ class CocRuntime:
                     session_id, "keeper_mercy", actor="system",
                     payload={"reason": "soft_hint", "scene": scene.id},
                 )
-                result.narrative = f"{result.narrative}\n\n（KP 提示）{hint}"
+                result.narrative = f"{result.narrative}\n\n{style.hint_prefix}{hint}"
                 return result
 
-        if idle >= 6 and not state.get(f"tick_{scene.id}"):
+        if idle >= style.tick_at and not state.get(f"tick_{scene.id}"):
             state[f"tick_{scene.id}"] = True
             state["tension"] = min(100, int(state.get("tension", 0)) + 10)
             self.store.append_event(
