@@ -29,6 +29,7 @@ from .domain import (
 from .module import Module, ModuleError, load_module
 from .replay import build_replay, save_replay
 from .runtime import CocRuntime, build_narrator
+from .runtime.persona import load_persona
 from .store.db import DEFAULT_DB_PATH, CocStore
 
 MODULE_DIR = Path(__file__).parent / "data" / "modules"
@@ -78,6 +79,7 @@ def get_runtime() -> CocRuntime:
             intent_parser=intent_parser,
             dialogue=dialogue,
             summarizer=client if enabled else None,
+            persona_loader=lambda scene: load_persona(scene),
         )
     return _runtime
 

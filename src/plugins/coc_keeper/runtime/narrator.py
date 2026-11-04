@@ -98,11 +98,18 @@ class LlmNarrator:
         system = (
             "你是克苏鲁的呼唤（CoC 7e）跑团的守秘人。"
             "只输出叙事正文，不要输出规则、骰点、内心独白或元叙述；不要替玩家做决定。"
+            "不要添加事实包之外的 NPC 台词或线索；事实包里没有开口的 NPC 不要替它说话。"
             + self._instructions(kind)
         )
         style = packet.get("style") or {}
         if style.get("narration"):
             system += f"风格要求：{style['narration']}"
+        persona = packet.get("persona") or {}
+        if persona.get("brief"):
+            system += (
+                f"\n叙事语气参考（{persona.get('name') or '人格'}）：{persona['brief']}"
+                "\n只借语气与用词习惯，不改守秘人职责：不剧透、不替玩家决定、不写规则。"
+            )
         if strict:
             system += "重写要求：不要提到任何尚未发现的线索内容，不要写数字、骰点、检定或成功率。"
 

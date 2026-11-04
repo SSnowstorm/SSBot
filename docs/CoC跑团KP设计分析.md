@@ -209,7 +209,8 @@ event(id, session_id, seq, type, actor, payload_json, created_at)
 ```
 
 `type` 取值示例：`session_start` / `scene_enter` / `action_declared` / `roll` / `state_change` /
-`clue_found` / `npc_talk` / `san_check` / `combat_round` / `scene_exit` / `ending` / `session_end` /
+`clue_found` / 
+pc_talk` / `san_check` / `combat_round` / `scene_exit` / `ending` / `session_end` /
 `ooc` / `tension_change` / `keeper_mercy` / `disrupt`。
 
 **为什么必须单独存事件，而不是只存"当前状态"**：
@@ -410,8 +411,10 @@ PDF/DOCX 模组
 | `scene.keeper_text`            | ❌（只在规则判定时用） |
 | `clue.player_text`（已发现）        | ✅           |
 | `clue.keeper_text` / 未发现线索     | ❌           |
-| `npc.public_json` / 当前场景内的公开态度 | ✅           |
-| `npc.secret_json`              | ❌           |
+| 
+pc.public_json` / 当前场景内的公开态度 | ✅           |
+| 
+pc.secret_json`              | ❌           |
 | `module.background`（真相）        | ❌           |
 
 实现上就是：`build_prompt()` 只从"玩家可见视图"取值，`keeper_view()` 单独给规则引擎和 KP 私聊用。**这是数据层约束，不是提示词约束。**
@@ -497,7 +500,8 @@ KP： 更新状态条 + 抛出下一场景/下一问
 
 **四不是硬约束（代码层执行）**：
 
-1. 不进叙事上下文（不写 `narrative`、不进 memory）；
+1. 不进叙事上下文（不写 
+arrative`、不进 memory）；
 2. 不耗回合（不推进 `turn_no`）；
 3. 不触发检定（不产生 `roll`）；
 4. 不改世界状态（不产生 `state_change` / `clue_found`）。
@@ -647,7 +651,8 @@ prompt 形态（示意）：
 
 ### 6.10 这些调控如何进入复盘
 
-事件类型扩充：`ooc` / `ooc_unresolved` / `ooc_correction` / `npc_talk` / `tension_change` / `keeper_mercy` / `world_tick` / `party_change` / `disrupt` / `character_import`。
+事件类型扩充：`ooc` / `ooc_unresolved` / `ooc_correction` / 
+pc_talk` / `tension_change` / `keeper_mercy` / `world_tick` / `party_change` / `disrupt` / `character_import`。
 
 战报中新增指标：放水次数与位置、难度调整记录、玩家违规类型分布、每个场景的卡关时长。
 
@@ -961,13 +966,15 @@ event 表 → 按 seq 重放 → 归类为：
 | 场景细节 | `module/model.py` + `Scene.details` | 每场景 4 条氛围细节，`env` 动作按序揭示，解决"看看周围"没反应 |
 | 剧透守卫 | `runtime/engine.py` | 不允许透露时，台词与线索原文共享 6 字片段即回退 |
 | 配置 | `.env.example` | `COC_LLM_ENABLED` / `COC_LLM_MODEL` / `COC_LLM_TIMEOUT` |
-| 叙事 | `runtime/narrator.py` | `LlmNarrator`：场景/线索/失败/结局交给模型；`npc` / `combat` / `sanity` / `env` 透传，不二次生成 |
+| 叙事 | `runtime/narrator.py` | `LlmNarrator`：场景/线索/失败/结局交给模型；
+pc` / `combat` / `sanity` / `env` 透传，不二次生成 |
 | 守卫 | `runtime/llm/guard.py` | 剧透（6 字片段）、规则字样（骰点/检定/成功率）、长度；不过则重写一次，再不过回退模板 |
 | 连续性 | `runtime/llm/memory.py` | `recent` 最近 16 条（注入最近 6 条）+ 每 10 回合滚动摘要；失败保留旧摘要 |
 | 事实包 | `runtime/engine.py` | `_narrate()` 统一入口；`forbidden` 只给守卫，不发给模型 |
 | 免命令模式 | `_commands.py` | 有 running 会话时普通消息即行动；`ooc:`/`//`/`（）` 走 OOC；只有本团玩家生效 |
 | 风格档位 | `runtime/style.py` | 宽松/标准/残酷：影响叙事指令、软提示/世界推进阈值、提示措辞 |
 | LLM 审计 | `runtime/engine.py` + `replay/builder.py` | 每次叙事调用记 `llm_call`（模型/耗时/是否重写/是否回退），战报统计一行 |
+| 叙事人格 | `runtime/persona.py` | 读取 suggarchat 人格文件，取 280 字语气简介注入叙事与 NPC 台词；`COC_PERSONA_MODE=auto/off/<名字>` |
 
 **A/B/C 阶段验收**：`test_coc_intent.py` 26 + `test_coc_narration.py` 20 + `test_coc_stage_c.py` 21（免命令分类/风格阈值/审计），全套 253 项断言通过。
 

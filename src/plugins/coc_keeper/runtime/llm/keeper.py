@@ -28,6 +28,7 @@ class NpcLineRequest:
     reveal_text: str = ""
     answers: dict = field(default_factory=dict)
     lines: list[str] = field(default_factory=list)
+    persona: str = ""
 
     def allowed_facts(self) -> list[str]:
         facts = [f for f in self.facts if f]
@@ -93,6 +94,8 @@ class LlmDialogueWriter:
             + f"\n角色：{brief['name']}｜身份：{brief['identity'] or '未知'}｜"
             f"态度：{brief['attitude'] or '平常'}｜说话风格：{brief['voice'] or '自然'}"
         )
+        if request.persona:
+            system += f"\n整体语气参考：{request.persona}（只借语气，NPC 仍按自己的身份说话）"
         user = (
             f"玩家说：「{request.question or '……'}」\n"
             f"你此刻可以说的事实：{'；'.join(facts) if facts else '（你不想多说）'}\n"

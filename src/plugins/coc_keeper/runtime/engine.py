@@ -69,6 +69,7 @@ class CocRuntime:
         intent_parser=None,
         dialogue=None,
         summarizer=None,
+        persona_loader=None,
     ):
         self.store = store
         self.narrator = narrator or TemplateNarrator()
@@ -76,6 +77,8 @@ class CocRuntime:
         self.intent = intent_parser or RuleIntentParser()
         self.dialogue = dialogue or TemplateDialogueWriter()
         self.summarizer = summarizer
+        self.persona_loader = persona_loader
+        self._persona_cache: dict[str, object] = {}
 
     # ---------------- 模组 ----------------
 
@@ -183,10 +186,23 @@ class CocRuntime:
 
     # ---------------- 意图与场景 ----------------
 
-    def _style_for(self, session_id: int) -> StyleProfile:
+    def _campaign_of(self, session_id: int) -> dict:
         session = self.store.get_session(session_id) or {}
-        campaign = self.store.get_campaign(int(session.get("campaign_id") or 0)) or {}
-        return get_style(campaign.get("keeper_style"))
+        return self.store.get_campaign(int(session.get("campaign_id") or 0)) or {}
+
+    def _style_for(self, session_id: int) -> StyleProfile:
+        return get_style(self._campaign_of(session_id).get("keeper_style"))
+
+    def _persona_for(self, campaign: dict):
+        if self.persona_loader is None:
+            return None
+        scene = "group" if int(campaign.get("group_id") or 0) > 0 else "private"
+        if scene not in self._persona_cache:
+            try:
+                self._persona_cache[scene] = self.persona_loader(scene)
+            except Exception:
+                self._persona_cache[scene] = None
+        return self._persona_cache[scene]
 
     async def _narrate(self, session_id, module, scene, kind, *, state=None, **fields) -> str:
         """统一叙事入口：注入玩家可见上下文与 forbidden（守卫用，不发给模型）。"""
@@ -217,6 +233,9 @@ class CocRuntime:
         }
         style = self._style_for(session_id)
         packet["style"] = {"key": style.key, "label": style.label, "narration": style.narration}
+        persona = self._persona_for(self._campaign_of(session_id))
+        if persona is not None:
+            packet["persona"] = {"name": persona.name, "brief": persona.brief}
         packet.update(fields)
 
         text = await self.narrator.narrate(packet)
@@ -373,6 +392,7 @@ class CocRuntime:
         can_reveal = clue is not None and not self.store.has_clue(session_id, clue.id)
         reveal_text = clue.player_text if (clue is not None and can_reveal) else ""
 
+        persona = self._persona_for(self._campaign_of(session_id))
         request = NpcLineRequest(
             name=npc.name,
             identity=str(npc.public.get("identity") or ""),
@@ -382,6 +402,7 @@ class CocRuntime:
             reveal_text=reveal_text,
             answers=dict(npc.answers or {}),
             lines=list(npc.lines or []),
+            persona=persona.brief if persona is not None else "",
         )
         line = (await self.dialogue.write(request, rng=self.rng)) or ""
         if not line:

@@ -129,7 +129,7 @@ nb run
 | `/coc 复盘 [文件]` | 生成本局战报（Markdown，加「文件」上传群文件） |
 | `/coc 结束` | 结束本局（管理员） |
 
-> 有进行中的团时，**玩家直接说话就是行动**（不用每条都打 `/coc 行动`）；`ooc:`、`//`、`（）` 开头视为 OOC，不进叙事。\n> 设 `COC_LLM_ENABLED=true`（配合 `DEEPSEEK_API_KEY`）后：叙事、意图解析与 NPC 台词交给模型——玩家换说法也能听懂、NPC 按人设说话、失败也有新方向；输出的剧透/骰点会被守卫拦下重写，任何失败自动回退规则与模板，断网也能跑。
+> 叙事会借用 suggarchat 当前人格（`group_prompt_character` / `private_prompt_character`）的语气——人设只影响措辞，不改变守秘人职责；`COC_PERSONA_MODE=off` 可关闭。\n> 有进行中的团时，**玩家直接说话就是行动**（不用每条都打 `/coc 行动`）；`ooc:`、`//`、`（）` 开头视为 OOC，不进叙事。\n> 设 `COC_LLM_ENABLED=true`（配合 `DEEPSEEK_API_KEY`）后：叙事、意图解析与 NPC 台词交给模型——玩家换说法也能听懂、NPC 按人设说话、失败也有新方向；输出的剧透/骰点会被守卫拦下重写，任何失败自动回退规则与模板，断网也能跑。
 > 内置示例模组：`src/plugins/coc_keeper/data/modules/wugang.json`（3 场景 / 5 线索 / 2 NPC / 2 结局）。
 
 ### 其他插件
