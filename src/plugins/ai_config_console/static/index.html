@@ -91,7 +91,7 @@
       <textarea class="prompt-editor" id="promptEditor" placeholder="选择或新建人格后编辑内容..." oninput="updatePromptStats()"></textarea>
     </div>
     <div class="prompt-stats">
-      <span>字数 <span class="count" id="promptCount">0 / 2000</span></span>
+      <span>字数 <span class="count" id="promptCount">0 / 6000</span></span>
       <span class="suggest-hint" id="promptHint">建议 ≤200 字以省 Token</span>
     </div>
     <div class="toolbar" style="margin-top:10px">
@@ -145,7 +145,7 @@ let configData = null;
 let currentScene = 'group';
 let currentPrompt = null;
 let groups = [];
-let promptMax = 2000;
+let promptMax = 6000;
 let configDirty = false;
 
 function showMsg(text, type) {

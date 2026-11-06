@@ -55,11 +55,11 @@ async def _init_token() -> None:
 
 @driver.on_startup
 async def _init_prompt_max() -> None:
-    """读取人格字数上限环境变量（默认 2000，可通过 AI_PROMPT_MAX_LENGTH 配置）。"""
-    val = os.getenv("AI_PROMPT_MAX_LENGTH", "2000")
+    """读取人格字数上限环境变量（默认 6000，可通过 AI_PROMPT_MAX_LENGTH 配置）。"""
+    val = os.getenv("AI_PROMPT_MAX_LENGTH", "6000")
     try:
         n = int(val)
     except (TypeError, ValueError):
-        n = 2000
+        n = 6000
     set_prompt_max(n)
     logger.info("[ai_config_console] 人格字数上限: {} 字", n)

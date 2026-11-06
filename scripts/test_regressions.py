@@ -241,7 +241,7 @@ def test_d01(client, h) -> None:
 def test_d02(client, h) -> None:
     print("\n== D-02 人格字数上限（AI_PROMPT_MAX_LENGTH） ==")
     r = client.get("/ai-config/api/status", headers=h)
-    check("默认上限 2000", r.json().get("prompt_max_length") == 2000, f"got {r.json()}")
+    check("默认上限 6000", r.json().get("prompt_max_length") == 6000, f"got {r.json()}")
 
     _models.set_prompt_max(50)
     r = client.get("/ai-config/api/status", headers=h)
@@ -253,7 +253,13 @@ def test_d02(client, h) -> None:
     r = client.put("/ai-config/api/prompts/group/too_long", headers=h, json={"content": "字" * 50})
     check("50 字 = 上限 → 200", r.status_code == 200, f"got {r.status_code}")
 
-    _models.set_prompt_max(2000)
+    _models.set_prompt_max(6000)
+
+    r = client.put("/ai-config/api/prompts/group/max_probe", headers=h, json={"content": "字" * 6000})
+    check("6000 字 = 上限 → 200", r.status_code == 200, f"got {r.status_code}")
+    r = client.put("/ai-config/api/prompts/group/max_probe", headers=h, json={"content": "字" * 6001})
+    check("6001 字 > 上限 → 400", r.status_code == 400, f"got {r.status_code}")
+    client.delete("/ai-config/api/prompts/group/max_probe", headers=h)
 
 
 # ============== D-04 备份清理 ==============

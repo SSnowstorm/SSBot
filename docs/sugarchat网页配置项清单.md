@@ -184,4 +184,5 @@
 | 2026-08-17 | 初版配置项清单（v1.0） | 王遵诗 / WorkBuddy |
 | 2026-08-17 | v1.1：[admin] 组纳入网页可编辑（admins/admin_group/allow_send_to_admin），核心可写 24→27 项；SUPERUSERS 维持 .env 单一来源 | 王遵诗 / WorkBuddy |
 | 2026-08-17 | v1.2：enable_tools 当前值更新为 false（F1 关闭，防工具复读） | 王遵诗 / WorkBuddy |
+| 2026-11-06 | v1.4：人格字数上限默认由 2000 提升到 6000（仍可用 `AI_PROMPT_MAX_LENGTH` 覆盖）；控制台字数计数与保存校验自动跟随 | 王遵诗 / DSH |
 | 2026-08-18 | v1.3：配合网页样式重构——人格字数上限改为环境变量 AI_PROMPT_MAX_LENGTH 可配置（默认 2000，安全兜底 10000）；网页新增省 Token 徽标（A1~A7 项标记「推荐关闭/推荐开启/已优化」）、今日汇总卡、三区折叠、字数统计软提示 | 王遵诗 / WorkBuddy |

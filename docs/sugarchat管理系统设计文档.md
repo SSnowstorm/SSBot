@@ -152,7 +152,7 @@ src/plugins/ai_config_console/
 | PUT | `/prompts/{scene}/{name}` | 新建/覆盖人格 | `{content}` | `{ok}` |
 | DELETE | `/prompts/{scene}/{name}` | 删除人格 | - | `{ok}` |
 
-约束：name 仅允许 `[\w\u4e00-\u9fa5_-]{1,50}`；content 业务上限由环境变量 `AI_PROMPT_MAX_LENGTH` 控制（默认 2000，Pydantic 安全兜底 10000）；设计案 ≤200 字建议值由网页软提示（超 200 琥珀色，不阻止保存）。新建（文件不存在）允许空内容，覆盖已有文件时禁止空内容（D-01 修复）。
+约束：name 仅允许 `[\w\u4e00-\u9fa5_-]{1,50}`；content 业务上限由环境变量 `AI_PROMPT_MAX_LENGTH` 控制（默认 6000，Pydantic 安全兜底 10000）；设计案 ≤200 字建议值由网页软提示（超 200 琥珀色，不阻止保存）。新建（文件不存在）允许空内容，覆盖已有文件时禁止空内容（D-01 修复）。
 
 ### 4.3 用量与备份
 
@@ -256,7 +256,7 @@ def require_token(x_ai_config_token: str = Header(default="")) -> None:
 | 3 | 备份保留 | config 备份**保留最近 10 份**，暂不加清理按钮 | 安全红线按此固化（见 5.3） |
 | 4 | 用量统计口径 | **仅统计次数可接受**；若 memory_data 表字段足以聚合 token 则顺带提供，字段不足不阻塞 | /usage 响应按次数设计（见 4.3） |
 | 5 | admin 组纳入网页 | **`[admin]` 组（admins/admin_group/allow_send_to_admin）网页可编辑**——管理系统网页仅内部开发人员可登录（Token 门禁），无需隔离权限管理；**SUPERUSERS 维持 .env 单一来源，不进网页** | EDITABLE_MAP 增加 admin 组；配置项清单 v1.1 |
-| 6 | 人格字数上限可配置 | **环境变量 `AI_PROMPT_MAX_LENGTH`（默认 2000）控制业务上限**；Pydantic 保留 10000 安全兜底防恶意超大请求；网页显示「字数 / 上限」+ 200 字软建议（琥珀色，不阻止保存）；熔断统计作为 P5 任务暂用占位 | _models.py CONTENT_MAX=10000 + PROMPT_MAX_LENGTH + set/get；_prompt_store 校验用配置值；__init__ 启动读环境变量 |
+| 6 | 人格字数上限可配置 | **环境变量 `AI_PROMPT_MAX_LENGTH`（默认 6000）控制业务上限**；Pydantic 保留 10000 安全兜底防恶意超大请求；网页显示「字数 / 上限」+ 200 字软建议（琥珀色，不阻止保存）；熔断统计作为 P5 任务暂用占位 | _models.py CONTENT_MAX=10000 + PROMPT_MAX_LENGTH + set/get；_prompt_store 校验用配置值；__init__ 启动读环境变量 |
 
 > 决策 4 附注：开发 P1 时实际查询 db.sqlite3 表结构，若 `suggarchat_memory_data` 含时间戳字段则按日统计次数；若含 token 计数字段则顺带输出 tokens，不额外设计。
 > 决策 5 附注：admins 为 QQ 号列表，前端标签输入；网页可编辑 admin 组不影响 SUPERUSERS（.env）对 NoneBot 全局的管控。

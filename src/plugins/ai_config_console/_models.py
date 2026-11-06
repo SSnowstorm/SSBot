@@ -16,8 +16,8 @@ NAME_PATTERN = r"^[\w\u4e00-\u9fa5_-]{1,50}$"
 # 人格内容安全兜底上限（Pydantic Field 用，防恶意超大请求；业务上限见 PROMPT_MAX_LENGTH）
 CONTENT_MAX = 10000
 
-# 人格内容业务上限（可通过环境变量 AI_PROMPT_MAX_LENGTH 配置，默认 2000）
-PROMPT_MAX_LENGTH = 2000
+# 人格内容业务上限（可通过环境变量 AI_PROMPT_MAX_LENGTH 配置，默认 6000）
+PROMPT_MAX_LENGTH = 6000
 
 
 def set_prompt_max(value: int) -> None:
@@ -42,7 +42,7 @@ class StatusResp(BaseModel):
     running: bool = True
     suggarchat_loaded: bool = False
     version: str = "1.0"
-    prompt_max_length: int = 2000
+    prompt_max_length: int = 6000
 
 
 class PromptListItem(BaseModel):
