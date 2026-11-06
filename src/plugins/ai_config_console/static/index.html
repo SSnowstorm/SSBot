@@ -238,7 +238,7 @@ const FIELD_META = {
   session_max_tokens: { label: '会话累计 Token 上限', desc: '会话累计 token 超限后自动清理', example: '5000' },
   enable: { label: '启用', desc: '自动回复总开关（概率冒泡）', example: 'false' },
   global_enable: { label: '全局启用', desc: '全部群统一启用自动回复', example: 'false' },
-  probability: { label: '触发概率', desc: '0~1，未 at 时主动冒泡的概率', example: '0.01' },
+  probability: { label: '自动回复概率', desc: '群聊普通消息按此概率冒泡（0~100%）；@ 或命中关键词仍然必回', example: '5' },
   keywords: { label: '触发关键词', desc: '命中关键词即触发回复，逗号分隔', example: 'at,你好' },
   keywords_mode: { label: '匹配模式', desc: 'starts_with=前缀匹配；contains=包含匹配', example: 'starts_with' },
   chat_pending_mode: { label: '排队模式', desc: '多请求时排队（queue）或丢弃（drop）', example: 'queue' },
@@ -349,15 +349,29 @@ function bindConfigEvents(wrap) {
   if (wrap.dataset.bound === '1') return;
   wrap.dataset.bound = '1';
   wrap.addEventListener('input', e => {
+    const box = e.target.closest ? e.target.closest('.rangebox') : null;
+    if (box) syncRangeBox(box, e.target);
     if (e.target.classList && e.target.classList.contains('tag-input')) return;
     markDirty();
   });
   wrap.addEventListener('change', e => {
+    const box = e.target.closest ? e.target.closest('.rangebox') : null;
+    if (box) syncRangeBox(box, e.target, true);
     if (e.target.classList && e.target.classList.contains('tag-input')) return;
     markDirty();
   });
   wrap.addEventListener('keydown', handleTagKeydown);
   wrap.addEventListener('focusout', handleTagBlur);
+}
+
+function syncRangeBox(box, source, clamp = false) {
+  const range = box.querySelector('.rng');
+  const num = box.querySelector('.rng-num');
+  let v = Number(source === range ? range.value : num.value);
+  if (!isFinite(v)) v = 0;
+  if (clamp || source === range) v = Math.max(0, Math.min(100, v));
+  range.value = v;
+  if (source !== num) num.value = v;
 }
 
 function renderField(group, key, v) {
@@ -384,6 +398,14 @@ function renderField(group, key, v) {
   let input = '';
   if (typeof value === 'boolean') {
     input = `<label class="switch"><input type="checkbox" data-group="${group}" data-key="${key}" ${value ? 'checked' : ''}${ro}><span class="slider"></span></label>`;
+  } else if (key === 'probability') {
+    // 自动回复概率：滑块 + 数字框；界面按 % 显示，存储仍是 0~1
+    const pct = Math.round(Number(value) * 1000) / 10;
+    input = `<div class="rangebox" data-group="${group}" data-key="${key}">
+      <input type="range" class="rng" min="0" max="100" step="1" value="${pct}"${ro}>
+      <input type="number" class="rng-num" min="0" max="100" step="0.1" value="${pct}"${ro}>
+      <span class="rng-unit">%</span>
+    </div>`;
   } else if (typeof value === 'number') {
     input = `<input type="number" data-group="${group}" data-key="${key}" value="${value}"${ro} placeholder="${example}">`;
   } else if (Array.isArray(value)) {
@@ -429,6 +451,13 @@ function collectConfig() {
     out[g] = {};
     document.querySelectorAll(`#configGroups [data-group="${g}"]`).forEach(el => {
       const key = el.dataset.key;
+      if (el.classList.contains('rangebox')) {
+        const num = el.querySelector('.rng-num');
+        if (!num || num.disabled) return;
+        const pct = Math.max(0, Math.min(100, Number(num.value) || 0));
+        out[g][key] = Math.round(pct * 10) / 1000;   // 5% → 0.05
+        return;
+      }
       if (el.classList.contains('tagbox')) {
         const isNum = el.dataset.num === 'true';
         let arr = [...el.querySelectorAll('.tag')].map(t => t.dataset.val);

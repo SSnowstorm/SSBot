@@ -179,6 +179,16 @@ def main():
         check("admin.admins 写入生效", r.json()["admin"]["admins"]["value"] == test_admins,
               f"got {r.json()['admin']['admins']}")
 
+        # 自动回复概率（控制台滑块写的就是这个字段）
+        old_prob = data["autoreply"]["probability"]["value"]
+        new_prob = 0.37
+        r = client.put("/ai-config/api/config", headers=h,
+                       json={"autoreply": {"probability": new_prob}})
+        check("probability 写入 200", r.status_code == 200, f"got {r.status_code} {r.text}")
+        r = client.get("/ai-config/api/config", headers=h)
+        got_prob = r.json()["autoreply"]["probability"]["value"]
+        check("probability 写入生效", abs(float(got_prob) - new_prob) < 1e-9, f"got {got_prob}")
+
         # 7. 人格 CRUD
         print("\n== 7. 人格 CRUD ==")
         content = "你是测试人格，用于 API 验证。"

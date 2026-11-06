@@ -360,3 +360,10 @@ textarea.prompt-editor {
 .tag-msg { font-size: 12px; margin-top: 4px; min-height: 16px; max-width: 380px; }
 .tag-msg.ok { color: var(--ok); }
 .tag-msg.err { color: var(--danger); }
+
+
+/* 自动回复概率：滑块 + 数字框 */
+.rangebox { display: flex; align-items: center; gap: 8px; }
+.rangebox .rng { width: 180px; accent-color: var(--accent); }
+.rangebox .rng-num { width: 84px; min-width: 84px; }
+.rangebox .rng-unit { font-size: 12px; color: var(--text-3); }
